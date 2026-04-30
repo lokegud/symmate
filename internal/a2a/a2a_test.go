@@ -36,7 +36,7 @@ func newTestHandler(t *testing.T) (*Handler, *mockRouter) {
 	hostDir := t.TempDir()
 	os.WriteFile(filepath.Join(hostDir, "context.md"), []byte("Name: Test Symmate\nA test Symmate for unit tests."), 0644)
 
-	card := BuildCard("https://test.example.com/a2a", hostDir)
+	card := BuildCard("https://test.example.com/a2a", "Test Symmate", "A test Symmate.")
 	router := &mockRouter{reply: "Hello from the other side."}
 	fw := firewall.New(nil)
 	personality := &staticPersonality{prompt: "You are a test Symmate."}
@@ -174,20 +174,22 @@ func TestMethodNotFound(t *testing.T) {
 	}
 }
 
-func TestBuildCard_ReadsContextMD(t *testing.T) {
-	hostDir := t.TempDir()
-	os.WriteFile(filepath.Join(hostDir, "context.md"),
-		[]byte("Name: Loke's Symmate\nA personal representative."), 0644)
-
-	card := BuildCard("https://loke.example.com/a2a", hostDir)
+func TestBuildCard_WithName(t *testing.T) {
+	card := BuildCard("https://loke.example.com/a2a", "Loke's Symmate", "Personal representative.")
 	if card.Name != "Loke's Symmate" {
-		t.Errorf("expected name from context.md, got %q", card.Name)
+		t.Errorf("expected provided name, got %q", card.Name)
+	}
+	if card.Description != "Personal representative." {
+		t.Errorf("expected provided description, got %q", card.Description)
 	}
 }
 
-func TestBuildCard_NoContextMD(t *testing.T) {
-	card := BuildCard("https://x.example.com/a2a", t.TempDir())
+func TestBuildCard_Defaults(t *testing.T) {
+	card := BuildCard("https://x.example.com/a2a", "", "")
 	if card.Name == "" {
 		t.Error("card name should have a fallback")
+	}
+	if card.SchemaVersion != "1.0" {
+		t.Errorf("expected schema version 1.0, got %q", card.SchemaVersion)
 	}
 }
