@@ -120,14 +120,12 @@ func main() {
 	}
 
 	servers := []*http.Server{healthServer, visitorServer, a2aServer, mcpServer}
-	// Yggdrasil extra A2A listener — binds the same handler to the Ygg IPv6 address.
-	// SYMMATE_A2A_YGG_ADDR must be set as "[200:xxxx::1]:port".
+	// Go's net.Listen("tcp", "0.0.0.0:PORT") creates a dual-stack [::] socket that
+	// already captures all IPv6 traffic including Yggdrasil. No extra listener needed.
 	if cfg.A2A.YggAddr != "" {
-		servers = append(servers, &http.Server{
-			Addr:    cfg.A2A.YggAddr,
-			Handler: a2aHandler,
-		})
-		l.Info().Str("addr", cfg.A2A.YggAddr).Msg("a2a ygg listener enabled")
+		l.Info().Str("ygg_addr", cfg.A2A.YggAddr).
+			Str("a2a_port", fmt.Sprintf("%d", cfg.A2A.Port)).
+			Msg("a2a reachable via yggdrasil (dual-stack listener)")
 	}
 	for _, srv := range servers {
 		s := srv
