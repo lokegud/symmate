@@ -74,7 +74,7 @@ func main() {
 		HostDir:     cfg.Host.HostDir,
 		HostType:    aeo.HostTypeMoxPer,
 		VisitorBase: fmt.Sprintf("%s:%d", cfg.Host.BaseURL, cfg.Visitor.Port),
-		A2ABase:     fmt.Sprintf("%s:%d", cfg.Host.BaseURL, 7843),
+		A2ABase:     fmt.Sprintf("%s:%d", cfg.Host.BaseURL, cfg.A2A.Port),
 		MCPBase:     fmt.Sprintf("%s:%d", cfg.Host.BaseURL, cfg.MCP.Port),
 	})
 	if err != nil {
@@ -104,12 +104,13 @@ func main() {
 		Handler: visitor.NewRouter(hc, brain, sessions),
 	}
 
-	// --- :7843 A2A endpoint ---
+	// --- A2A endpoint (default + optional Yggdrasil extra listener) ---
 	a2aCard := a2a.BuildCard(hc.Profile.Endpoints.A2A, hc.Profile.Name, hc.Profile.Description)
 	a2aMsgHdlr := a2a.NewMessageHandler(personalityLoader, router, fw)
+	a2aHandler := a2a.NewHandler(a2aCard, a2aMsgHdlr)
 	a2aServer := &http.Server{
-		Addr:    "0.0.0.0:7843",
-		Handler: a2a.NewHandler(a2aCard, a2aMsgHdlr),
+		Addr:    fmt.Sprintf("0.0.0.0:%d", cfg.A2A.Port),
+		Handler: a2aHandler,
 	}
 
 	// --- :7844 MCP server ---
@@ -119,6 +120,15 @@ func main() {
 	}
 
 	servers := []*http.Server{healthServer, visitorServer, a2aServer, mcpServer}
+	// Yggdrasil extra A2A listener — binds the same handler to the Ygg IPv6 address.
+	// SYMMATE_A2A_YGG_ADDR must be set as "[200:xxxx::1]:port".
+	if cfg.A2A.YggAddr != "" {
+		servers = append(servers, &http.Server{
+			Addr:    cfg.A2A.YggAddr,
+			Handler: a2aHandler,
+		})
+		l.Info().Str("addr", cfg.A2A.YggAddr).Msg("a2a ygg listener enabled")
+	}
 	for _, srv := range servers {
 		s := srv
 		go func() {

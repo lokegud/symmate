@@ -12,6 +12,7 @@ type Config struct {
 	Host    HostConfig    `toml:"host"`
 	Visitor VisitorConfig `toml:"visitor"`
 	MCP     MCPConfig     `toml:"mcp"`
+	A2A     A2AConfig     `toml:"a2a"`
 }
 
 // ServerConfig is the legacy health/version server (kept for compatibility).
@@ -39,6 +40,12 @@ type MCPConfig struct {
 	Port int `toml:"port"`
 }
 
+// A2AConfig configures the A2A endpoint.
+type A2AConfig struct {
+	Port    int    `toml:"port"`
+	YggAddr string `toml:"ygg_addr"` // optional extra listener on Yggdrasil interface, e.g. "[200:xxxx::1]:7843"
+}
+
 // Load loads config from environment or TOML file, applying defaults.
 func Load() (*Config, error) {
 	cfg := defaults()
@@ -58,6 +65,18 @@ func Load() (*Config, error) {
 	}
 	if base := os.Getenv("SYMMATE_BASE_URL"); base != "" {
 		cfg.Host.BaseURL = base
+	}
+	if port := os.Getenv("SYMMATE_VISITOR_PORT"); port != "" {
+		fmt.Sscanf(port, "%d", &cfg.Visitor.Port)
+	}
+	if port := os.Getenv("SYMMATE_MCP_PORT"); port != "" {
+		fmt.Sscanf(port, "%d", &cfg.MCP.Port)
+	}
+	if port := os.Getenv("SYMMATE_A2A_PORT"); port != "" {
+		fmt.Sscanf(port, "%d", &cfg.A2A.Port)
+	}
+	if addr := os.Getenv("SYMMATE_A2A_YGG_ADDR"); addr != "" {
+		cfg.A2A.YggAddr = addr
 	}
 
 	// Load from config.toml if present
@@ -88,6 +107,9 @@ func defaults() *Config {
 		},
 		MCP: MCPConfig{
 			Port: 7844,
+		},
+		A2A: A2AConfig{
+			Port: 7843,
 		},
 	}
 }
