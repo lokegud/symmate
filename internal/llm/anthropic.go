@@ -9,18 +9,25 @@ import (
 	"net/http"
 )
 
-const anthropicEndpoint = "https://api.anthropic.com/v1/messages"
+const anthropicDefaultEndpoint = "https://api.anthropic.com/v1/messages"
 const anthropicVersion = "2023-06-01"
 
 // AnthropicProvider calls the Anthropic Messages API directly.
 type AnthropicProvider struct {
-	apiKey string
-	client *http.Client
+	endpoint string
+	apiKey   string
+	client   *http.Client
 }
 
 // NewAnthropicProvider creates an Anthropic provider with the given API key.
 func NewAnthropicProvider(apiKey string) *AnthropicProvider {
-	return &AnthropicProvider{apiKey: apiKey, client: &http.Client{}}
+	return &AnthropicProvider{endpoint: anthropicDefaultEndpoint, apiKey: apiKey, client: &http.Client{}}
+}
+
+// NewAnthropicProviderAt creates an Anthropic provider pointing at a custom endpoint.
+// Used in tests to point at a stub server instead of api.anthropic.com.
+func NewAnthropicProviderAt(endpoint, apiKey string) *AnthropicProvider {
+	return &AnthropicProvider{endpoint: endpoint, apiKey: apiKey, client: &http.Client{}}
 }
 
 type anthropicRequest struct {
@@ -74,7 +81,7 @@ func (p *AnthropicProvider) Complete(ctx context.Context, model string, messages
 		return "", err
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, anthropicEndpoint, bytes.NewReader(body))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, p.endpoint, bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}
