@@ -1,5 +1,5 @@
 <script lang="ts">
-	import '@symmate/design-system/minimal.css';
+	import '$lib/styles/minimal.css';
 	import favicon from '$lib/assets/favicon.svg';
 
 	let { children } = $props();
