@@ -1,6 +1,12 @@
-// Design system — Wren will populate this with tokens, components, mascot states.
-// Placeholder exports so workspace imports resolve during scaffold phase.
+// Symmate Design System — Wren · 2026-05-02
+// Quick start: import '@symmate/design-system/minimal.css' in your root layout.
+// Full tokens: import '@symmate/design-system/tokens.css'
 
-export const tokens = {
-	// Wren: palette, spacing, typography go here
-} as const;
+export * from './tokens.js';
+
+export { default as Button }      from './components/Button.svelte';
+export { default as Card }        from './components/Card.svelte';
+export { default as Badge }       from './components/Badge.svelte';
+export { default as Input }       from './components/Input.svelte';
+export { default as Avatar }      from './components/Avatar.svelte';
+export { default as MascotBlob }  from './components/MascotBlob.svelte';
