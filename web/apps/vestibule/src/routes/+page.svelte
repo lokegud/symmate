@@ -31,7 +31,7 @@
 			</p>
 		{/if}
 
-		<a href="/chat" class="cta">Talk to my Symmate →</a>
+		<a href="/.well-known/agent-card.json" class="cta" target="_blank">View agent card →</a>
 
 		{#if persona.capabilities?.length}
 			<div class="capabilities">
