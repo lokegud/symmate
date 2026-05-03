@@ -11,46 +11,46 @@ type Config struct {
 	Server  ServerConfig  `toml:"server"`
 	Host    HostConfig    `toml:"host"`
 	Visitor VisitorConfig `toml:"visitor"`
+	Owner   OwnerConfig   `toml:"owner"`
 	MCP     MCPConfig     `toml:"mcp"`
 	A2A     A2AConfig     `toml:"a2a"`
 }
 
-// ServerConfig is the legacy health/version server (kept for compatibility).
 type ServerConfig struct {
 	Port int    `toml:"port"`
 	Host string `toml:"host"`
 }
 
-// HostConfig describes the Symmate host identity.
 type HostConfig struct {
-	Slug    string `toml:"slug"`    // e.g. "loke"
-	HostDir string `toml:"host_dir"` // e.g. "/var/lib/symmate/loke"
-	BaseURL string `toml:"base_url"` // e.g. "http://localhost" (no port)
+	Slug    string `toml:"slug"`
+	HostDir string `toml:"host_dir"`
+	BaseURL string `toml:"base_url"`
 }
 
-// VisitorConfig configures the visitor API listener on :7842.
 type VisitorConfig struct {
 	Port       int `toml:"port"`
-	RatePerMin int `toml:"rate_per_min"` // per-IP request rate limit
-	TokenCap   int `toml:"token_cap"`    // per-session token cap
+	RatePerMin int `toml:"rate_per_min"`
+	TokenCap   int `toml:"token_cap"`
 }
 
-// MCPConfig configures the MCP server listener on :7844.
+// OwnerConfig configures the owner management API listener on :7841.
+// Bound to localhost — SvelteKit server-side is the only consumer.
+type OwnerConfig struct {
+	Port int `toml:"port"`
+}
+
 type MCPConfig struct {
 	Port int `toml:"port"`
 }
 
-// A2AConfig configures the A2A endpoint.
 type A2AConfig struct {
 	Port    int    `toml:"port"`
-	YggAddr string `toml:"ygg_addr"` // optional extra listener on Yggdrasil interface, e.g. "[200:xxxx::1]:7843"
+	YggAddr string `toml:"ygg_addr"`
 }
 
-// Load loads config from environment or TOML file, applying defaults.
 func Load() (*Config, error) {
 	cfg := defaults()
 
-	// Override from env
 	if port := os.Getenv("SYMMATE_PORT"); port != "" {
 		fmt.Sscanf(port, "%d", &cfg.Server.Port)
 	}
@@ -69,6 +69,9 @@ func Load() (*Config, error) {
 	if port := os.Getenv("SYMMATE_VISITOR_PORT"); port != "" {
 		fmt.Sscanf(port, "%d", &cfg.Visitor.Port)
 	}
+	if port := os.Getenv("SYMMATE_OWNER_PORT"); port != "" {
+		fmt.Sscanf(port, "%d", &cfg.Owner.Port)
+	}
 	if port := os.Getenv("SYMMATE_MCP_PORT"); port != "" {
 		fmt.Sscanf(port, "%d", &cfg.MCP.Port)
 	}
@@ -79,7 +82,6 @@ func Load() (*Config, error) {
 		cfg.A2A.YggAddr = addr
 	}
 
-	// Load from config.toml if present
 	if _, err := os.Stat("config.toml"); err == nil {
 		if _, err := toml.DecodeFile("config.toml", cfg); err != nil {
 			return nil, err
@@ -91,25 +93,15 @@ func Load() (*Config, error) {
 
 func defaults() *Config {
 	return &Config{
-		Server: ServerConfig{
-			Port: 8080,
-			Host: "0.0.0.0",
-		},
+		Server: ServerConfig{Port: 8080, Host: "0.0.0.0"},
 		Host: HostConfig{
 			Slug:    "default",
 			HostDir: "/var/lib/symmate/default",
 			BaseURL: "http://localhost",
 		},
-		Visitor: VisitorConfig{
-			Port:       7842,
-			RatePerMin: 60,
-			TokenCap:   5000,
-		},
-		MCP: MCPConfig{
-			Port: 7844,
-		},
-		A2A: A2AConfig{
-			Port: 7843,
-		},
+		Visitor: VisitorConfig{Port: 7842, RatePerMin: 60, TokenCap: 5000},
+		Owner:   OwnerConfig{Port: 7841},
+		MCP:     MCPConfig{Port: 7844},
+		A2A:     A2AConfig{Port: 7843},
 	}
 }

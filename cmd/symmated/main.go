@@ -18,6 +18,7 @@ import (
 	"github.com/loke/symmate/internal/llm"
 	"github.com/loke/symmate/internal/logger"
 	"github.com/loke/symmate/internal/mcp"
+	"github.com/loke/symmate/internal/owner"
 	"github.com/loke/symmate/internal/personality"
 	"github.com/loke/symmate/internal/storage"
 	"github.com/loke/symmate/internal/visitor"
@@ -35,7 +36,6 @@ func main() {
 	}
 	l.Info().Str("version", version.String()).Str("host", cfg.Host.Slug).Msg("starting symmated")
 
-	// --- Storage (acquires singleton lock, runs migrations) ---
 	key, err := loadOrDeriveKey(cfg.Host.HostDir)
 	if err != nil {
 		l.Fatal().Err(err).Msg("key setup failed")
@@ -46,7 +46,6 @@ func main() {
 	}
 	defer db.Close()
 
-	// --- Audit log (JSONL primary + SQLite encrypted mirror) ---
 	auditPath := filepath.Join(cfg.Host.HostDir, "audit.jsonl")
 	auditStore, err := audit.NewSQLiteStore(auditPath, &auditStoreBridge{db: db})
 	if err != nil {
@@ -55,20 +54,15 @@ func main() {
 	auditLogger := audit.NewLogger(auditStore)
 	defer auditLogger.Close()
 
-	// --- Personality engine (hot-reload on context.md / vertical.md changes) ---
 	personalityLoader, err := personality.NewLoader(cfg.Host.HostDir)
 	if err != nil {
 		l.Fatal().Err(err).Str("hostDir", cfg.Host.HostDir).Msg("personality loader init failed")
 	}
 	defer personalityLoader.Close()
 
-	// --- LLM router ---
 	router := llm.NewRouter(&llmAuditBridge{al: auditLogger})
-
-	// --- Privacy firewall ---
 	fw := firewall.New(&firewallAuditBridge{al: auditLogger})
 
-	// --- AEO profile ---
 	hc, err := aeo.Build(aeo.BuildConfig{
 		Slug:        cfg.Host.Slug,
 		HostDir:     cfg.Host.HostDir,
@@ -82,7 +76,6 @@ func main() {
 	}
 	l.Info().Str("name", hc.Profile.Name).Msg("host context loaded")
 
-	// --- :8080 Legacy health/version server ---
 	healthMux := http.NewServeMux()
 	healthMux.HandleFunc("/health", handleHealth)
 	healthMux.HandleFunc("/version", handleVersion)
@@ -91,20 +84,41 @@ func main() {
 		Handler: healthMux,
 	}
 
-	// --- :7842 Visitor API ---
 	brain := &Brain{
 		loader:   personalityLoader,
 		router:   router,
 		firewall: fw,
-		grants:   []firewall.Grant{}, // deny-all PII; owner configures via Owner API
+		grants:   []firewall.Grant{},
 	}
+
+	reloadGrants := func() {
+		grants, err := db.ListGrants(context.Background(), "")
+		if err != nil {
+			l.Error().Err(err).Msg("owner: failed to reload grants")
+			return
+		}
+		fwGrants := make([]firewall.Grant, 0, len(grants))
+		for _, g := range grants {
+			fwGrants = append(fwGrants, firewall.Grant{
+				DataClass:  g.DataClass,
+				Permission: g.Permission,
+			})
+		}
+		brain.SetGrants(fwGrants)
+	}
+	reloadGrants()
+	ownerHandler := owner.New(cfg.Host.HostDir, db, reloadGrants)
+	ownerServer := &http.Server{
+		Addr:    fmt.Sprintf("127.0.0.1:%d", cfg.Owner.Port),
+		Handler: ownerHandler.Router(),
+	}
+
 	sessions := visitor.NewSessions(cfg.Visitor.RatePerMin, cfg.Visitor.TokenCap)
 	visitorServer := &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", cfg.Visitor.Port),
 		Handler: visitor.NewRouter(hc, brain, sessions),
 	}
 
-	// --- A2A endpoint (default + optional Yggdrasil extra listener) ---
 	a2aCard := a2a.BuildCard(hc.Profile.Endpoints.A2A, hc.Profile.Name, hc.Profile.Description)
 	a2aMsgHdlr := a2a.NewMessageHandler(personalityLoader, router, fw)
 	a2aHandler := a2a.NewHandler(a2aCard, a2aMsgHdlr)
@@ -113,15 +127,12 @@ func main() {
 		Handler: a2aHandler,
 	}
 
-	// --- :7844 MCP server ---
 	mcpServer := &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", cfg.MCP.Port),
 		Handler: mcp.NewServer(hc, &mcpAuditBridge{al: auditLogger}).Router(),
 	}
 
-	servers := []*http.Server{healthServer, visitorServer, a2aServer, mcpServer}
-	// Go's net.Listen("tcp", "0.0.0.0:PORT") creates a dual-stack [::] socket that
-	// already captures all IPv6 traffic including Yggdrasil. No extra listener needed.
+	servers := []*http.Server{healthServer, ownerServer, visitorServer, a2aServer, mcpServer}
 	if cfg.A2A.YggAddr != "" {
 		l.Info().Str("ygg_addr", cfg.A2A.YggAddr).
 			Str("a2a_port", fmt.Sprintf("%d", cfg.A2A.Port)).

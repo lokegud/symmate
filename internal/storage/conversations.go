@@ -163,3 +163,39 @@ func (d *DB) GetMessages(ctx context.Context, conversationID string) ([]*Message
 	}
 	return msgs, nil
 }
+
+// ListConversations returns conversations ordered by most recent first.
+// limit=0 returns all.
+func (d *DB) ListConversations(ctx context.Context, limit int) ([]*Conversation, error) {
+	var rows []struct {
+		ID            string  `db:"id"`
+		VisitorHandle *string `db:"visitor_handle"`
+		Surface       string  `db:"surface"`
+		StartedAt     int64   `db:"started_at"`
+		EndedAt       *int64  `db:"ended_at"`
+		Outcome       *string `db:"outcome"`
+	}
+	query := `SELECT id, visitor_handle, surface, started_at, ended_at, outcome
+              FROM conversations ORDER BY started_at DESC`
+	var err error
+	if limit > 0 {
+		err = d.sqlx.SelectContext(ctx, &rows, query+" LIMIT ?", limit)
+	} else {
+		err = d.sqlx.SelectContext(ctx, &rows, query)
+	}
+	if err != nil {
+		return nil, err
+	}
+	convs := make([]*Conversation, 0, len(rows))
+	for _, r := range rows {
+		convs = append(convs, &Conversation{
+			ID:            r.ID,
+			VisitorHandle: r.VisitorHandle,
+			Surface:       r.Surface,
+			StartedAt:     r.StartedAt,
+			EndedAt:       r.EndedAt,
+			Outcome:       r.Outcome,
+		})
+	}
+	return convs, nil
+}

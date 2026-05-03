@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"sync"
 
 	"github.com/loke/symmate/internal/firewall"
 	"github.com/loke/symmate/internal/llm"
@@ -15,14 +16,17 @@ type Brain struct {
 	loader   *personality.Loader
 	router   *llm.Router
 	firewall *firewall.Firewall
-	// grants is the active capability policy for outbound responses.
-	// Empty = deny-all PII until owner configures grants via Owner API.
-	grants []firewall.Grant
+	grants   []firewall.Grant
+	mu       sync.RWMutex
 }
 
-// Chat satisfies visitor.Brain. It assembles the system prompt, routes the
-// conversation through the LLM, and applies the privacy firewall before
-// streaming the reply token-by-token.
+// SetGrants replaces the live grant list. Called by the owner API after CRUD.
+func (b *Brain) SetGrants(grants []firewall.Grant) {
+	b.mu.Lock()
+	b.grants = grants
+	b.mu.Unlock()
+}
+
 func (b *Brain) Chat(ctx context.Context, msgs []visitor.Message) (<-chan string, error) {
 	sysPrompt := b.loader.Current()
 	tag := inferTag(msgs)
@@ -45,15 +49,16 @@ func (b *Brain) Chat(ctx context.Context, msgs []visitor.Message) (<-chan string
 			return
 		}
 
-		filtered, _ := b.firewall.Filter(ctx, reply, b.grants)
+		b.mu.RLock()
+		grants := b.grants
+		b.mu.RUnlock()
+		filtered, _ := b.firewall.Filter(ctx, reply, grants)
 		ch <- filtered
 	}()
 
 	return ch, nil
 }
 
-// inferTag picks the routing tag from the last user message content.
-// Falls back to llm.Classify for keyword-based inference.
 func inferTag(msgs []visitor.Message) string {
 	for i := len(msgs) - 1; i >= 0; i-- {
 		if msgs[i].Role == "user" {
