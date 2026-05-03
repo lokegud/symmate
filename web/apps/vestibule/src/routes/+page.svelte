@@ -25,7 +25,10 @@
 		<p class="description">{persona.description}</p>
 
 		{#if persona.contact?.location}
-			<p class="location">📍 {persona.contact.location}</p>
+			<p class="location">
+				<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+				{persona.contact.location}
+			</p>
 		{/if}
 
 		<a href="/chat" class="cta">Talk to my Symmate →</a>
@@ -123,9 +126,17 @@
 	}
 
 	.location {
-		text-align: center;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.3rem;
 		color: #6b7280;
 		font-size: 0.875rem;
+	}
+
+	.location svg {
+		color: #4b5563;
+		flex-shrink: 0;
 	}
 
 	.cta {
