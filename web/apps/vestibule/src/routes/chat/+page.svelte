@@ -157,6 +157,10 @@
 		color: #6b7280;
 		text-decoration: none;
 		font-size: 0.875rem;
+		padding: 0.5rem 0;
+		min-height: 44px;
+		display: flex;
+		align-items: center;
 	}
 
 	.back:hover {

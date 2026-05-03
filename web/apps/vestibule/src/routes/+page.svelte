@@ -185,6 +185,10 @@
 		color: #6b7280;
 		font-size: 0.8rem;
 		text-decoration: none;
+		padding: 0.75rem 0.5rem;
+		min-height: 44px;
+		display: flex;
+		align-items: center;
 	}
 
 	footer a:hover {
