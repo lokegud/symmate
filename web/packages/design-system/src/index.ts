@@ -1,6 +1,6 @@
 // Symmate Design System — Wren · 2026-05-02
-// Import tokens.css in your app root layout:
-//   import '@symmate/design-system/tokens.css';
+// Quick start: import '@symmate/design-system/minimal.css' in your root layout.
+// Full tokens: import '@symmate/design-system/tokens.css'
 
 export * from './tokens.js';
 

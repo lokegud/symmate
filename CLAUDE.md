@@ -24,33 +24,24 @@ Use ~/.claude/skills/gstack/... for gstack file paths (the global path).
 
 ## Design System
 
-Always read `web/DESIGN.md` before making any visual or UI decisions.
-All font choices, colors, spacing, border-radius, shadows, and motion are defined there.
-Do not use arbitrary values — pull from the token set in `packages/design-system/src/tokens.css`.
-Do not deviate without explicit approval from Wren.
-In QA mode: flag any code that doesn't reference design tokens.
+Read `web/DESIGN.md` before any visual/UI work. Source of truth.
 
-Import tokens in any new app layout:
+**Quick start (Wright + Keel):**
 ```svelte
-import '@symmate/design-system/tokens.css';
+import '@symmate/design-system/minimal.css';
 ```
+Static HTML: copy `web/packages/design-system/src/minimal.css` into a `<style>` tag.
 
-Component gallery: platform app at `/design-gallery` (dev only, not linked in production nav).
+Key variables: `--color-bg`, `--color-surface`, `--color-text`, `--color-accent`, `--color-warm`, `--font-display`, `--font-body`, `--font-mono`, `--text-*`, `--space-*`, `--radius-*`.
+
+Do not use arbitrary hex or font values. Use the tokens.
 
 ## Skill routing
 
 When the user's request matches an available skill, invoke it via the Skill tool.
 
-Key routing rules:
-- Product ideas/brainstorming → invoke /office-hours
-- Strategy/scope → invoke /plan-ceo-review
-- Architecture → invoke /plan-eng-review
-- Design system/plan review → invoke /design-consultation or /plan-design-review
-- Full review pipeline → invoke /autoplan
-- Bugs/errors → invoke /investigate
-- QA/testing site behavior → invoke /qa or /qa-only
-- Code review/diff check → invoke /review
-- Visual polish → invoke /design-review
-- Ship/deploy/PR → invoke /ship or /land-and-deploy
-- Save progress → invoke /context-save
-- Resume context → invoke /context-restore
+- Bugs/errors → /investigate
+- QA/testing → /qa or /qa-only
+- Code review → /review
+- Visual polish → /design-review
+- Ship/deploy → /ship or /land-and-deploy
