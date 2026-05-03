@@ -1,0 +1,13 @@
+{
+	"name": "symmate-web",
+	"private": true,
+	"version": "0.0.1",
+	"workspaces": ["apps/*", "packages/*"],
+	"scripts": {
+		"dev:platform": "bun run --cwd apps/platform dev",
+		"dev:vestibule": "bun run --cwd apps/vestibule dev",
+		"build:platform": "bun run --cwd apps/platform build",
+		"build:vestibule": "bun run --cwd apps/vestibule build",
+		"check": "bun run --cwd apps/platform check && bun run --cwd apps/vestibule check"
+	}
+}
