@@ -1,0 +1,19 @@
+<script lang="ts">
+	let { children } = $props();
+</script>
+
+{@render children()}
+
+<style>
+	:global(*, *::before, *::after) { box-sizing: border-box; margin: 0; padding: 0; }
+	:global(html, body) {
+		width: 100%;
+		height: 100%;
+		overflow: hidden;
+		background: #080810;
+		color: rgba(255,255,255,0.85);
+	}
+	:global(::-webkit-scrollbar) { width: 4px; }
+	:global(::-webkit-scrollbar-track) { background: transparent; }
+	:global(::-webkit-scrollbar-thumb) { background: rgba(255,255,255,0.1); border-radius: 2px; }
+</style>

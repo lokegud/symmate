@@ -1,50 +1,30 @@
-import type { AgentCard, PersonaIdentity, SendMessageRequest, SendMessageResponse } from '@symmate/types';
+import type { AgentCard, PersonaIdentity } from '@symmate/types';
 
-// Port constants — override via VITE_* env vars in each app
-const VISITOR_PORT = 7842;
-const OWNER_PORT = 7841;
-const AGENT_CARD_PORT = 7843;
+// Runtime ports — can be overridden by SYMMATE_VISITOR_PORT env var in server context
+export const VISITOR_PORT = 7842;
+export const AGENT_CARD_PORT = 7843;
 
-function base(port: number): string {
-	const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-	return `http://${host}:${port}`;
+export function visitorBase(host = '127.0.0.1'): string {
+	return `http://${host}:${VISITOR_PORT}`;
 }
 
-let _rpcId = 0;
-
-// Visitor API (:7842)
-
-export async function getPersonaIdentity(): Promise<PersonaIdentity> {
-	const res = await fetch(`${base(VISITOR_PORT)}/id`);
+export async function getPersonaIdentity(host?: string): Promise<PersonaIdentity> {
+	const res = await fetch(`${visitorBase(host)}/id`);
 	if (!res.ok) throw new Error(`getPersonaIdentity: ${res.status}`);
 	return res.json();
 }
 
-export async function sendMessage(
-	text: string,
-	sessionId?: string
-): Promise<SendMessageResponse> {
-	const body: SendMessageRequest = {
-		jsonrpc: '2.0',
-		id: ++_rpcId,
-		method: 'agent/sendMessage',
-		params: { text, sessionId }
-	};
-	const res = await fetch(`${base(VISITOR_PORT)}/agent/sendMessage`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(body)
-	});
-	if (!res.ok) throw new Error(`sendMessage: ${res.status}`);
-	return res.json();
-}
-
-// Agent Card API (:7843)
-
-export async function getAgentCard(): Promise<AgentCard> {
-	const res = await fetch(`${base(AGENT_CARD_PORT)}/.well-known/agent-card.json`);
+export async function getAgentCard(host?: string): Promise<AgentCard> {
+	const res = await fetch(`${visitorBase(host)}/.well-known/agent-card.json`);
 	if (!res.ok) throw new Error(`getAgentCard: ${res.status}`);
 	return res.json();
 }
 
-export { VISITOR_PORT, OWNER_PORT, AGENT_CARD_PORT };
+// Returns a raw Response with SSE body — caller pipes it to the client.
+export async function startChatStream(message: string, host?: string): Promise<Response> {
+	return fetch(`${visitorBase(host)}/chat`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ message })
+	});
+}
