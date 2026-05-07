@@ -96,12 +96,16 @@ func main() {
 		loader:   personalityLoader,
 		router:   router,
 		firewall: fw,
-		grants:   []firewall.Grant{}, // deny-all PII; owner configures via Owner API
+		grants:   []firewall.Grant{}, // deny-all PII; host configures via Host API
 	}
 	sessions := visitor.NewSessions(cfg.Visitor.RatePerMin, cfg.Visitor.TokenCap)
+	var ff *visitor.Forcefield
+	if cfg.Visitor.PokerEndpoint != "" {
+		ff = visitor.NewForcefield(cfg.Visitor.PokerEndpoint)
+	}
 	visitorServer := &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", cfg.Visitor.Port),
-		Handler: visitor.NewRouter(hc, brain, sessions),
+		Handler: visitor.NewRouter(hc, brain, sessions, ff),
 	}
 
 	// --- A2A endpoint (default + optional Yggdrasil extra listener) ---

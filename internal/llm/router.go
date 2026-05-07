@@ -74,7 +74,7 @@ func (r *Router) resolve(tag string) (Provider, string, string) {
 		return r.anthropic, ModelOpus, "anthropic"
 	case TagPrivacyBound:
 		return r.hermes, "hermes", "hermes"
-	default: // TagDefault and anything unrecognised
-		return r.anthropic, ModelSonnet, "anthropic"
+	default: // TagDefault and anything unrecognised — privacy-first, route to hermes
+		return r.hermes, "hermes", "hermes"
 	}
 }

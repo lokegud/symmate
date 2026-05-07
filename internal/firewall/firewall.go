@@ -18,7 +18,7 @@ func New(audit AuditLogger) *Firewall {
 // Filter inspects text, applies grants, and returns the rewritten text plus an overall decision.
 // Decision is the most restrictive verdict across all detected PII classes:
 //
-//	deny > ask-owner > allow
+//	deny > ask-host > allow
 //
 // The returned text has denied/asked spans replaced by coarse equivalents.
 func (f *Firewall) Filter(ctx context.Context, text string, grants []Grant) (filtered string, decision Decision) {
@@ -39,8 +39,8 @@ func (f *Firewall) Filter(ctx context.Context, text string, grants []Grant) (fil
 				decision = DecisionDeny
 			}
 		case "ask":
-			if decision < DecisionAskOwner {
-				decision = DecisionAskOwner
+			if decision < DecisionAskHost {
+				decision = DecisionAskHost
 			}
 		}
 	}
@@ -55,7 +55,7 @@ func (f *Firewall) Filter(ctx context.Context, text string, grants []Grant) (fil
 	switch decision {
 	case DecisionDeny:
 		_ = f.audit.FirewallDeny(ctx, event)
-	case DecisionAskOwner:
+	case DecisionAskHost:
 		_ = f.audit.FirewallAsk(ctx, event)
 	}
 

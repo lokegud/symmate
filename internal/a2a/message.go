@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/loke/symmate/internal/firewall"
 	"github.com/loke/symmate/internal/llm"
@@ -24,7 +25,7 @@ type MessageHandler struct {
 	personality PersonalitySource
 	router      LLMRouter
 	firewall    *firewall.Firewall
-	// defaultGrants applied to all A2A responses (conservative; owner configures via policy).
+	// defaultGrants applied to all A2A responses (conservative; host configures via policy).
 	defaultGrants []firewall.Grant
 }
 
@@ -67,7 +68,9 @@ func (h *MessageHandler) Handle(ctx context.Context, rawParams json.RawMessage) 
 		{Role: "user", Content: text},
 	}
 
-	reply, err := h.router.Route(ctx, tag, messages)
+	llmCtx, llmCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer llmCancel()
+	reply, err := h.router.Route(llmCtx, tag, messages)
 	if err != nil {
 		return SendMessageResult{}, &RPCError{Code: ErrInternal, Message: "llm error: " + err.Error()}
 	}

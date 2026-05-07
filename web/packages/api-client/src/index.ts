@@ -1,7 +1,10 @@
 import type { AgentCard, PersonaIdentity } from '@symmate/types';
 
-// Runtime ports — can be overridden by SYMMATE_VISITOR_PORT env var in server context
-export const VISITOR_PORT = 7842;
+// Runtime ports — overridden by SYMMATE_VISITOR_PORT env var in server context
+const _visitorPort = (typeof process !== 'undefined' && process.env?.SYMMATE_VISITOR_PORT)
+	? parseInt(process.env.SYMMATE_VISITOR_PORT, 10)
+	: 7842;
+export const VISITOR_PORT = _visitorPort;
 export const AGENT_CARD_PORT = 7843;
 
 export function visitorBase(host = '127.0.0.1'): string {

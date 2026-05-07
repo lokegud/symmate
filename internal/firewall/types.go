@@ -7,7 +7,7 @@ type Decision int
 
 const (
 	DecisionAllow    Decision = iota
-	DecisionAskOwner          // default-deny on timeout; owner must be notified
+	DecisionAskHost          // default-deny on timeout; owner must be notified
 	DecisionDeny
 )
 
@@ -15,8 +15,8 @@ func (d Decision) String() string {
 	switch d {
 	case DecisionAllow:
 		return "allow"
-	case DecisionAskOwner:
-		return "ask-owner"
+	case DecisionAskHost:
+		return "ask-host"
 	case DecisionDeny:
 		return "deny"
 	default:

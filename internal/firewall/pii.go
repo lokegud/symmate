@@ -2,7 +2,7 @@ package firewall
 
 import "regexp"
 
-// PII regex patterns for v0. Flag + ask-owner beats silent leak.
+// PII regex patterns for v0. Flag + ask-host beats silent leak.
 var (
 	reEmail = regexp.MustCompile(
 		`\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b`,

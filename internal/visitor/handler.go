@@ -1,6 +1,7 @@
 package visitor
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,8 +13,9 @@ import (
 	"github.com/loke/symmate/internal/aeo"
 )
 
-// AgentCard is the A2A Agent Card served at /.well-known/agent-card.json.
-// Read-only copy; the authoritative one is on the A2A port (7843).
+//go:embed chat.html
+var chatHTML []byte
+
 type AgentCard struct {
 	Name               string            `json:"name"`
 	Description        string            `json:"description"`
@@ -38,20 +40,23 @@ type agentSkill struct {
 	Tags        []string `json:"tags"`
 }
 
-// ChatRequest is the body accepted by POST /chat.
 type ChatRequest struct {
 	Message       string `json:"message"`
 	VisitorHandle string `json:"visitor_handle,omitempty"`
 }
 
 // NewRouter builds the visitor API chi router.
-// profile is pre-built; brain is stubbed until Forge merges.
-func NewRouter(hc *aeo.HostContext, brain Brain, sessions *Sessions) http.Handler {
+// forcefield may be nil — when nil, all messages pass through unchecked.
+func NewRouter(hc *aeo.HostContext, brain Brain, sessions *Sessions, forcefield *Forcefield) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 
-	r.Post("/chat", chatHandler(hc, brain, sessions))
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(chatHTML)
+	})
+	r.Post("/chat", chatHandler(hc, brain, sessions, forcefield))
 	r.Get("/id", idHandler(hc.Profile))
 	r.Get("/llms.txt", llmsTxtHandler(hc))
 	r.Get("/.well-known/agent-card.json", agentCardHandler(hc.Profile))
@@ -60,7 +65,7 @@ func NewRouter(hc *aeo.HostContext, brain Brain, sessions *Sessions) http.Handle
 	return r
 }
 
-func chatHandler(hc *aeo.HostContext, brain Brain, sessions *Sessions) http.HandlerFunc {
+func chatHandler(hc *aeo.HostContext, brain Brain, sessions *Sessions, ff *Forcefield) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sess := sessions.Get(r.RemoteAddr)
 		if !sess.Allow() {
@@ -76,6 +81,28 @@ func chatHandler(hc *aeo.HostContext, brain Brain, sessions *Sessions) http.Hand
 		if strings.TrimSpace(req.Message) == "" {
 			http.Error(w, "message is required", http.StatusBadRequest)
 			return
+		}
+
+		// Forcefield: evaluate the message before it reaches the LLM.
+		// Fails open — if Poker is unreachable the message passes through.
+		if ff != nil {
+			callerType := "human"
+			if r.Header.Get("X-A2A-Sender") != "" || r.Header.Get("Agent-Card") != "" {
+				callerType = "agent"
+			}
+			callerID := r.RemoteAddr
+			if handle := req.VisitorHandle; handle != "" {
+				callerID = handle
+			}
+			hostCtx := fmt.Sprintf("Symmate for %s", hc.Profile.Name)
+
+			allow, reportID, _ := ff.Check(r.Context(), callerID, callerType, req.Message, hostCtx)
+			if !allow {
+				sse := NewSSEWriter(w)
+				sse.Send(BlockedMessage(reportID))
+				sse.Done()
+				return
+			}
 		}
 
 		msgs := []Message{
