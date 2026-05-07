@@ -32,3 +32,15 @@ go.work
 .env
 .env.local
 config.toml
+
+# Editor backups
+*.bak
+
+# Build state
+/var/
+
+# Local Stripe state
+stripe-state.json
+
+# Strategy docs — keep local until ready for public
+/docs/
