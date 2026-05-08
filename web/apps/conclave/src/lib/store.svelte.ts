@@ -1,4 +1,4 @@
-export type ModuleType = 'hub' | 'chat' | 'canvas' | 'presence' | 'stream' | 'decisions' | 'taskboard';
+export type ModuleType = 'hub' | 'chat' | 'canvas' | 'presence' | 'stream' | 'decisions' | 'taskboard' | 'syslog' | 'resources';
 
 export interface BoxState {
 	id: string;
@@ -80,7 +80,7 @@ class AgentStore {
 
 export const agentStore = new AgentStore();
 
-export const HUB_URL = '/api';
+export const HUB_URL = typeof window !== 'undefined' && window.__TAURI__ ? 'http://192.168.50.140:7447' : '/api';
 
 // Keel's /api/cohort/state — richer merged state (hub + Sygil)
 export type CohortMember = {

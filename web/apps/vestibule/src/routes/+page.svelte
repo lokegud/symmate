@@ -13,10 +13,19 @@
 <main>
 	<div class="vestibule">
 		<header>
-			<div class="avatar-placeholder" aria-hidden="true">
-				{persona.name[0]}
+			<div class="mascot-wrap" aria-hidden="true">
+				<div class="mascot-glow"></div>
+				<img
+					src="/mascot/mascot-idle.svg"
+					alt=""
+					class="mascot"
+					width="160"
+					height="190"
+				/>
 			</div>
-			<h1>{persona.name}</h1>
+
+			<h1 class="persona-name">{persona.name}</h1>
+
 			{#if persona.host_type}
 				<span class="badge">{persona.host_type}</span>
 			{/if}
@@ -26,12 +35,14 @@
 
 		{#if persona.contact?.location}
 			<p class="location">
-				<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+				<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+					<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+				</svg>
 				{persona.contact.location}
 			</p>
 		{/if}
 
-		<a href="/.well-known/agent-card.json" class="cta" target="_blank">View agent card →</a>
+		<a href="/chat" class="cta">Start a conversation →</a>
 
 		{#if persona.capabilities?.length}
 			<div class="capabilities">
@@ -54,21 +65,15 @@
 </main>
 
 <style>
-	:global(*, *::before, *::after) {
-		box-sizing: border-box;
-		margin: 0;
-		padding: 0;
-	}
-
 	:global(body) {
-		font-family: system-ui, -apple-system, sans-serif;
-		background: #0f0f11;
-		color: #e8e8e8;
+		background: var(--color-bg);
+		color: var(--color-text);
+		font-family: var(--font-body);
 		min-height: 100dvh;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		padding: 1.5rem;
+		padding: var(--space-6);
 	}
 
 	.vestibule {
@@ -76,122 +81,187 @@
 		width: 100%;
 		display: flex;
 		flex-direction: column;
-		gap: 1.25rem;
+		gap: var(--space-6);
 	}
 
 	header {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 0.5rem;
+		gap: var(--space-3);
 		text-align: center;
 	}
 
-	.avatar-placeholder {
-		width: 72px;
-		height: 72px;
-		border-radius: 50%;
-		background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+	/* Mascot */
+	.mascot-wrap {
+		position: relative;
+		width: 160px;
+		height: 190px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		font-size: 2rem;
-		font-weight: 700;
-		color: #fff;
-		user-select: none;
 	}
 
-	h1 {
-		font-size: 1.75rem;
-		font-weight: 700;
-		letter-spacing: -0.02em;
+	.mascot-glow {
+		position: absolute;
+		inset: -20px;
+		border-radius: var(--radius-full);
+		background: radial-gradient(
+			ellipse at 50% 60%,
+			color-mix(in srgb, var(--color-accent) 22%, transparent),
+			color-mix(in srgb, var(--color-warm) 10%, transparent) 55%,
+			transparent 75%
+		);
+		animation: glow-pulse 3s ease-in-out infinite;
+	}
+
+	.mascot {
+		position: relative;
+		width: 160px;
+		height: 190px;
+		object-fit: contain;
+		animation: mascot-breathe 3s ease-in-out infinite;
+		filter: drop-shadow(0 8px 24px color-mix(in srgb, var(--color-accent) 28%, transparent));
+	}
+
+	@keyframes mascot-breathe {
+		0%, 100% { transform: translateY(0) scale(1); }
+		50%       { transform: translateY(-7px) scale(1.025); }
+	}
+
+	@keyframes glow-pulse {
+		0%, 100% { opacity: 0.7; transform: scale(1); }
+		50%       { opacity: 1;   transform: scale(1.08); }
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.mascot, .mascot-glow { animation: none; }
+	}
+
+	/* Typography */
+	.persona-name {
+		font-family: var(--font-display);
+		font-optical-sizing: auto;
+		font-size: var(--text-2xl);
+		font-weight: var(--weight-bold);
+		letter-spacing: -0.03em;
+		line-height: 1.15;
+		color: var(--color-text);
 	}
 
 	.badge {
-		font-size: 0.7rem;
+		font-family: var(--font-body);
+		font-size: var(--text-xs);
+		font-weight: var(--weight-medium);
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
-		color: #9ca3af;
-		background: #1e1e24;
-		padding: 0.2rem 0.6rem;
-		border-radius: 99px;
-		border: 1px solid #2e2e38;
+		color: var(--color-text-subtle);
+		background: var(--color-surface-raised);
+		border: 1px solid var(--color-border);
+		padding: 0.2em 0.65em;
+		border-radius: var(--radius-full);
 	}
 
 	.description {
-		color: #b0b0c0;
+		color: var(--color-text-muted);
 		line-height: 1.6;
 		text-align: center;
-		font-size: 0.95rem;
+		font-size: var(--text-base);
 	}
 
 	.location {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		gap: 0.3rem;
-		color: #6b7280;
-		font-size: 0.875rem;
+		gap: var(--space-1);
+		color: var(--color-text-subtle);
+		font-size: var(--text-sm);
 	}
 
 	.location svg {
-		color: #4b5563;
+		color: var(--color-text-subtle);
 		flex-shrink: 0;
+		opacity: 0.7;
 	}
 
+	/* CTA — prism gradient (brand moment) */
 	.cta {
 		display: block;
-		background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+		background: linear-gradient(
+			135deg,
+			var(--color-accent),
+			color-mix(in srgb, var(--color-accent) 50%, var(--color-warm)),
+			var(--color-warm)
+		);
 		color: #fff;
 		text-decoration: none;
 		text-align: center;
-		padding: 0.9rem 1.5rem;
-		border-radius: 12px;
-		font-weight: 600;
-		font-size: 1rem;
+		padding: var(--space-4) var(--space-6);
+		border-radius: var(--radius-lg);
+		font-family: var(--font-body);
+		font-weight: var(--weight-semibold);
+		font-size: var(--text-base);
 		letter-spacing: -0.01em;
-		transition: opacity 0.15s;
+		transition: opacity 0.15s ease, transform 0.15s ease;
+		box-shadow: 0 4px 20px color-mix(in srgb, var(--color-accent) 30%, transparent);
 	}
 
 	.cta:hover {
-		opacity: 0.9;
+		opacity: 0.92;
+		transform: translateY(-1px);
+		box-shadow: 0 6px 28px color-mix(in srgb, var(--color-accent) 38%, transparent);
 	}
 
+	.cta:active {
+		transform: translateY(0);
+		opacity: 0.85;
+	}
+
+	/* Capabilities */
 	.capabilities {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.4rem;
+		gap: var(--space-2);
 		justify-content: center;
 	}
 
 	.cap-tag {
-		font-size: 0.75rem;
-		background: #1e1e24;
-		border: 1px solid #2e2e38;
-		padding: 0.2rem 0.65rem;
-		border-radius: 99px;
-		color: #9ca3af;
+		font-size: var(--text-sm);
+		font-weight: var(--weight-medium);
+		background: var(--color-surface);
+		border: 1px solid var(--color-border-subtle);
+		color: var(--color-text-muted);
+		padding: 0.22em 0.7em;
+		border-radius: var(--radius-full);
+		transition: border-color 0.12s, color 0.12s;
 	}
 
+	.cap-tag:hover {
+		border-color: var(--color-border);
+		color: var(--color-text);
+	}
+
+	/* Footer */
 	footer {
 		display: flex;
 		justify-content: center;
-		gap: 1.25rem;
-		padding-top: 0.5rem;
-		border-top: 1px solid #1e1e24;
+		gap: var(--space-6);
+		padding-top: var(--space-3);
+		border-top: 1px solid var(--color-border-subtle);
 	}
 
 	footer a {
-		color: #6b7280;
-		font-size: 0.8rem;
+		color: var(--color-text-subtle);
+		font-size: var(--text-sm);
 		text-decoration: none;
-		padding: 0.75rem 0.5rem;
+		padding: var(--space-3) var(--space-2);
 		min-height: 44px;
 		display: flex;
 		align-items: center;
+		transition: color 0.12s;
 	}
 
 	footer a:hover {
-		color: #9ca3af;
+		color: var(--color-text-muted);
 	}
 </style>

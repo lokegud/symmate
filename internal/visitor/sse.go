@@ -10,13 +10,20 @@ type SSEWriter struct {
 	w http.ResponseWriter
 }
 
-// NewSSEWriter sets SSE headers and returns a writer.
+// NewSSEWriter sets SSE headers, writes an SSE comment to start the stream immediately
+// (keeps long-TTFT models from appearing stuck in the browser), and returns a writer.
 func NewSSEWriter(w http.ResponseWriter) *SSEWriter {
 	h := w.Header()
 	h.Set("Content-Type", "text/event-stream")
 	h.Set("Cache-Control", "no-cache")
 	h.Set("Connection", "keep-alive")
 	h.Set("X-Accel-Buffering", "no") // tell nginx not to buffer
+	// SSE comment starts the HTTP response body immediately so the browser
+	// sees the connection as established rather than pending.
+	fmt.Fprint(w, ": connected\n\n")
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
 	return &SSEWriter{w: w}
 }
 

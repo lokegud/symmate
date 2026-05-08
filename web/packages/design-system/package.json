@@ -5,7 +5,9 @@
 	"type": "module",
 	"main": "./src/index.ts",
 	"exports": {
-		".": "./src/index.ts"
+		".": "./src/index.ts",
+		"./minimal.css": "./src/minimal.css",
+		"./tokens.css": "./src/tokens.css"
 	},
 	"devDependencies": {
 		"svelte": "^5.55.2",

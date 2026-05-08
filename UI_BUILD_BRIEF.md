@@ -88,3 +88,25 @@ Day 2+: parallel build.
 
 - TLS certs: Cloudflare-managed (let CF handle origin via tunnel) or Let's Encrypt direct? Recommend CF.
 - Onboarding capture form: stub email collection or full design spec? Recommend stub for v1.
+
+---
+
+# REFOCUS — 2026-05-03 — YC deadline <24h
+
+The plan above stands as the v1 target. **For the next 24 hours**, drop everything not in this list:
+
+## YC-critical only
+
+1. **Trace:** symmate.com + loke.symmate.com must RESOLVE with valid TLS. bob.justadestination.com fixing the 525 is also urgent. URGENT.
+2. **Wright:** minimal one-page landing at symmate.com. Hero + value prop + "what is a Symmate" + footer. ONE PAGE. No build pipeline complexity. Static HTML+CSS is fine if SvelteKit scaffold isn't ready.
+3. **Keel:** scaffold + MINIMAL vestibule at loke.symmate.com. Just renders /id from running runtime. No /chat UI yet, no /owner, no auth. Just the persona-as-page.
+4. **Wren:** minimal tokens — palette + typography only. Mascot deferred. Wright + Keel get tokens to use.
+5. **Forge:** HOLD dashboard. Available to support Wright/Keel if API needed. If idle, run /qa against landing pages as they ship.
+6. **Quill:** stay on YC. Help Loke close. Landing copy second priority — Wright can stub-text v0.
+
+**Definition of YC-shippable:**
+- `https://symmate.com` returns a real page with valid TLS
+- `https://loke.symmate.com` returns Loke's vestibule with valid TLS
+- YC application submitted
+
+Everything else — full UI build, dashboard, /chat, design system, mascot integration — resumes after YC.

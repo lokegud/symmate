@@ -1,7 +1,6 @@
-import { t as index_server_exports } from "../../chunks/index-server.js";
-import { b as noop } from "../../chunks/shared.js";
+import { J as noop, O as writable, V as escape_html, X as getContext, t as index_server_exports } from "../../chunks/index-server.js";
+import { b as noop$1 } from "../../chunks/shared.js";
 import "../../chunks/environment.js";
-import { R as escape_html, T as writable, Z as getContext, q as noop$1 } from "../../chunks/dev.js";
 import "../../chunks/exports.js";
 import "../../chunks/internal.js";
 import "@sveltejs/kit/internal";
@@ -42,7 +41,7 @@ function notifiable_store(value) {
 		subscribe
 	};
 }
-var updated_listener = { v: noop };
+var updated_listener = { v: noop$1 };
 function create_updated_store() {
 	const { set, subscribe } = writable(false);
 	return {
@@ -52,7 +51,7 @@ function create_updated_store() {
 }
 var navigating$1;
 var updated$1;
-var is_legacy = noop$1.toString().includes("$$") || /function \w+\(\) \{\}/.test(noop$1.toString());
+var is_legacy = noop.toString().includes("$$") || /function \w+\(\) \{\}/.test(noop.toString());
 var placeholder_url = "a:";
 if (is_legacy) {
 	new URL(placeholder_url);

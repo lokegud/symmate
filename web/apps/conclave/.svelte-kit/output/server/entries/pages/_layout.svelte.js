@@ -1,9 +1,11 @@
-import "../../chunks/dev.js";
+import "../../chunks/index-server.js";
 //#region src/routes/+layout.svelte
 function _layout($$renderer, $$props) {
-	let { children } = $$props;
-	children($$renderer);
-	$$renderer.push(`<!---->`);
+	$$renderer.component(($$renderer) => {
+		let { children } = $$props;
+		children($$renderer);
+		$$renderer.push(`<!---->`);
+	});
 }
 //#endregion
 export { _layout as default };

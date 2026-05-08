@@ -1,6 +1,15 @@
 <script lang="ts">
 	import '$lib/styles/tokens.css';
+	import { onMount } from 'svelte';
 	let { children } = $props();
+
+	onMount(() => {
+		// Detect Tauri shell and activate HUD mode (transparent overlay).
+		// window.__TAURI__ is injected by Tauri 2 at runtime.
+		if (typeof window !== 'undefined' && '__TAURI__' in window) {
+			document.documentElement.dataset.hubMode = 'hud';
+		}
+	});
 </script>
 
 {@render children()}

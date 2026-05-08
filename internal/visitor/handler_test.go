@@ -41,7 +41,7 @@ func testHostContext() *aeo.HostContext {
 
 func TestIDHandler(t *testing.T) {
 	hc := testHostContext()
-	router := NewRouter(hc, BrainStub{}, NewSessions(0, 0))
+	router := NewRouter(hc, BrainStub{}, NewSessions(0, 0), nil, nil, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/id", nil)
 	w := httptest.NewRecorder()
@@ -68,7 +68,7 @@ func TestIDHandler(t *testing.T) {
 
 func TestAgentCardHandler(t *testing.T) {
 	hc := testHostContext()
-	router := NewRouter(hc, BrainStub{}, NewSessions(0, 0))
+	router := NewRouter(hc, BrainStub{}, NewSessions(0, 0), nil, nil, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/.well-known/agent-card.json", nil)
 	w := httptest.NewRecorder()
@@ -95,7 +95,7 @@ func TestAgentCardHandler(t *testing.T) {
 
 func TestLLMsTxtHandler(t *testing.T) {
 	hc := testHostContext()
-	router := NewRouter(hc, BrainStub{}, NewSessions(0, 0))
+	router := NewRouter(hc, BrainStub{}, NewSessions(0, 0), nil, nil, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/llms.txt", nil)
 	w := httptest.NewRecorder()
@@ -115,7 +115,7 @@ func TestLLMsTxtHandler(t *testing.T) {
 
 func TestChatHandler_Streams(t *testing.T) {
 	hc := testHostContext()
-	router := NewRouter(hc, BrainStub{}, NewSessions(0, 0))
+	router := NewRouter(hc, BrainStub{}, NewSessions(0, 0), nil, nil, nil)
 
 	body := strings.NewReader(`{"message":"hello"}`)
 	req := httptest.NewRequest(http.MethodPost, "/chat", body)
@@ -156,7 +156,7 @@ func TestChatHandler_RateLimit(t *testing.T) {
 	hc := testHostContext()
 	// 1 req/min → second request should be rate-limited.
 	sessions := NewSessions(1, 0)
-	router := NewRouter(hc, BrainStub{}, sessions)
+	router := NewRouter(hc, BrainStub{}, sessions, nil, nil, nil)
 
 	sendChat := func() int {
 		body := strings.NewReader(`{"message":"hello"}`)
@@ -178,7 +178,7 @@ func TestChatHandler_RateLimit(t *testing.T) {
 
 func TestChatHandler_EmptyMessage(t *testing.T) {
 	hc := testHostContext()
-	router := NewRouter(hc, BrainStub{}, NewSessions(0, 0))
+	router := NewRouter(hc, BrainStub{}, NewSessions(0, 0), nil, nil, nil)
 
 	body := strings.NewReader(`{"message":""}`)
 	req := httptest.NewRequest(http.MethodPost, "/chat", body)

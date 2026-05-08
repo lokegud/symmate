@@ -24,6 +24,15 @@ type HostConfig struct {
 	Slug    string `toml:"slug"`
 	HostDir string `toml:"host_dir"`
 	BaseURL string `toml:"base_url"`
+
+	// Per-surface public URL overrides. When set, these are advertised in the
+	// agent card verbatim (no `:port` suffix is appended). Production
+	// deployments need HTTPS URLs here per A2A spec §7.1; without overrides,
+	// URLs fall back to BaseURL + ":" + port (typically plain HTTP and
+	// not spec-compliant).
+	A2APublicURL     string `toml:"a2a_public_url"`
+	VisitorPublicURL string `toml:"visitor_public_url"`
+	MCPPublicURL     string `toml:"mcp_public_url"`
 }
 
 type VisitorConfig struct {
@@ -59,6 +68,15 @@ func Load() (*Config, error) {
 	}
 	if base := os.Getenv("SYMMATE_BASE_URL"); base != "" {
 		cfg.Host.BaseURL = base
+	}
+	if u := os.Getenv("SYMMATE_A2A_PUBLIC_URL"); u != "" {
+		cfg.Host.A2APublicURL = u
+	}
+	if u := os.Getenv("SYMMATE_VISITOR_PUBLIC_URL"); u != "" {
+		cfg.Host.VisitorPublicURL = u
+	}
+	if u := os.Getenv("SYMMATE_MCP_PUBLIC_URL"); u != "" {
+		cfg.Host.MCPPublicURL = u
 	}
 	if port := os.Getenv("SYMMATE_VISITOR_PORT"); port != "" {
 		fmt.Sscanf(port, "%d", &cfg.Visitor.Port)

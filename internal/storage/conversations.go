@@ -125,6 +125,37 @@ func (d *DB) AppendMessage(ctx context.Context, m *Message) error {
 	return err
 }
 
+// ListConversations returns up to limit conversations ordered by started_at DESC.
+// Metadata is not decrypted — use GetConversation for that.
+func (d *DB) ListConversations(ctx context.Context, limit, offset int) ([]*Conversation, error) {
+	var rows []struct {
+		ID            string  `db:"id"`
+		VisitorHandle *string `db:"visitor_handle"`
+		Surface       string  `db:"surface"`
+		StartedAt     int64   `db:"started_at"`
+		EndedAt       *int64  `db:"ended_at"`
+		Outcome       *string `db:"outcome"`
+	}
+	if err := d.sqlx.SelectContext(ctx, &rows,
+		`SELECT id, visitor_handle, surface, started_at, ended_at, outcome
+         FROM conversations ORDER BY started_at DESC LIMIT ? OFFSET ?`,
+		limit, offset); err != nil {
+		return nil, err
+	}
+	out := make([]*Conversation, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, &Conversation{
+			ID:            r.ID,
+			VisitorHandle: r.VisitorHandle,
+			Surface:       r.Surface,
+			StartedAt:     r.StartedAt,
+			EndedAt:       r.EndedAt,
+			Outcome:       r.Outcome,
+		})
+	}
+	return out, nil
+}
+
 // GetMessages fetches and decrypts all messages for a conversation, ordered by ts.
 func (d *DB) GetMessages(ctx context.Context, conversationID string) ([]*Message, error) {
 	var rows []struct {

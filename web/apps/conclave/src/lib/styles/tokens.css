@@ -145,4 +145,31 @@
   /* ------------------------------------------------------------------ */
   --hub-grid-color:   rgba(255, 255, 255, 0.015);
   --hub-grid-size:    48px;
+
+  /* ------------------------------------------------------------------ */
+  /* Hub mode                                                            */
+  /* cockpit = solid dark void (browser tab / dev)                       */
+  /* hud     = transparent overlay (Tauri desktop shell / AR)            */
+  /* Set by JS: document.documentElement.dataset.hubMode = 'hud'         */
+  /* ------------------------------------------------------------------ */
+  --hub-mode: cockpit;
+}
+
+/* HUD mode overrides — active when Tauri sets data-hub-mode="hud" on <html> */
+[data-hub-mode="hud"] {
+  --hub-bg:               transparent;
+  --hub-surface:          rgba(12, 12, 22, 0.70);
+  --hub-surface-raised:   rgba(16, 16, 28, 0.75);
+  --hub-surface-overlay:  rgba(8, 8, 16, 0.80);
+
+  /* Bumped from 0.55 — frosted boxes need more body over busy desktop backdrops */
+  --hub-glass-bg:         rgba(8, 8, 14, 0.65);
+
+  /* Stronger borders for contrast over light/colourful desktop content */
+  --hub-border:           rgba(255, 255, 255, 0.11);
+  --hub-border-strong:    rgba(255, 255, 255, 0.18);
+
+  /* Deeper shadow so boxes lift clearly off the desktop layer */
+  --hub-shadow-box:       0 8px 40px rgba(0, 0, 0, 0.60),
+                          inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
