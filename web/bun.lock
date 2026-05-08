@@ -19,6 +19,24 @@
         "vite": "^8.0.7",
       },
     },
+    "apps/operator": {
+      "name": "@symmate/operator",
+      "version": "0.0.1",
+      "dependencies": {
+        "@symmate/api-client": "workspace:*",
+        "@symmate/design-system": "workspace:*",
+        "@symmate/types": "workspace:*",
+      },
+      "devDependencies": {
+        "@sveltejs/adapter-node": "^5.2.12",
+        "@sveltejs/kit": "^2.57.0",
+        "@sveltejs/vite-plugin-svelte": "^7.0.0",
+        "svelte": "^5.55.2",
+        "svelte-check": "^4.4.6",
+        "typescript": "^6.0.2",
+        "vite": "^8.0.7",
+      },
+    },
     "apps/platform": {
       "name": "@symmate/platform",
       "version": "0.0.1",
@@ -203,6 +221,8 @@
     "@symmate/conclave": ["@symmate/conclave@workspace:apps/conclave"],
 
     "@symmate/design-system": ["@symmate/design-system@workspace:packages/design-system"],
+
+    "@symmate/operator": ["@symmate/operator@workspace:apps/operator"],
 
     "@symmate/platform": ["@symmate/platform@workspace:apps/platform"],
 

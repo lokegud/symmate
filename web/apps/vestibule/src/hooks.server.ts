@@ -1,18 +1,49 @@
 import type { Handle } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 
-// Owner routes require a valid owner_token cookie.
-// Token is minted by the Go owner API on POST /auth/login and stored in the cookie.
+const A2A_BACKEND = 'http://localhost:7843';
+const MCP_BACKEND = 'http://localhost:7844';
+
 export const handle: Handle = async ({ event, resolve }) => {
 	const path = event.url.pathname;
 
-	// Protect all /owner/* routes except login.
-	if (path.startsWith('/owner') && !path.startsWith('/owner/login')) {
-		const token = event.cookies.get('owner_token');
-		if (!token) {
-			throw redirect(303, '/owner/login');
-		}
-		event.locals.ownerToken = token;
+	// /.well-known/agent.json — legacy path; redirect to current spec path
+	if (path === '/.well-known/agent.json') {
+		throw redirect(301, '/.well-known/agent-card.json');
+	}
+
+	// /.well-known/agent-card.json — proxy to A2A server
+	if (path === '/.well-known/agent-card.json') {
+		const upstream = await fetch(A2A_BACKEND + path);
+		const body = await upstream.text();
+		return new Response(body, {
+			status: upstream.status,
+			headers: {
+				'content-type': 'application/json',
+				'cache-control': 'max-age=300',
+				'access-control-allow-origin': '*'
+			}
+		});
+	}
+
+	// /.well-known/mcp.json — proxy to MCP server
+	if (path === '/.well-known/mcp.json') {
+		const upstream = await fetch(MCP_BACKEND + path);
+		const body = await upstream.text();
+		return new Response(body, {
+			status: upstream.status,
+			headers: {
+				'content-type': 'application/json',
+				'cache-control': 'max-age=300',
+				'access-control-allow-origin': '*'
+			}
+		});
+	}
+
+	// Owner routes are served by the operator app (port 7091), not the vestibule.
+	// Return 404 so visitors cannot accidentally reach the operator surface.
+	if (path.startsWith('/owner')) {
+		return new Response('Not found', { status: 404 });
 	}
 
 	return resolve(event);
