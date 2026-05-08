@@ -136,7 +136,7 @@
 	.no-agents {
 		font-size: 11px;
 		color: rgba(255,255,255,0.25);
-		font-family: ui-monospace, monospace;
+		font-family: var(--hub-font-mono);
 	}
 
 	.agent-chip {
@@ -145,14 +145,14 @@
 		border-radius: 4px;
 		color: rgba(255,255,255,0.5);
 		font-size: 11px;
-		font-family: ui-monospace, monospace;
+		font-family: var(--hub-font-mono);
 		padding: 3px 8px;
 		cursor: pointer;
 		transition: all 0.15s;
 	}
 	.agent-chip.active {
-		background: rgba(139, 92, 246, 0.2);
-		border-color: rgba(139, 92, 246, 0.4);
+		background: var(--hub-violet-dim);
+		border-color: var(--hub-violet-border);
 		color: rgba(255,255,255,0.85);
 	}
 
@@ -177,14 +177,14 @@
 
 	.msg-from {
 		font-size: 10px;
-		font-family: ui-monospace, monospace;
-		color: rgba(139, 92, 246, 0.6);
+		font-family: var(--hub-font-mono);
+		color: color-mix(in srgb, var(--hub-violet) 60%, transparent);
 		letter-spacing: 0.05em;
 	}
 
 	.msg-text {
 		font-size: 12px;
-		font-family: ui-monospace, monospace;
+		font-family: var(--hub-font-mono);
 		line-height: 1.55;
 		padding: 8px 12px;
 		border-radius: 8px;
@@ -193,8 +193,8 @@
 	}
 
 	.msg.user .msg-text {
-		background: rgba(139, 92, 246, 0.18);
-		border: 1px solid rgba(139, 92, 246, 0.25);
+		background: var(--hub-violet-dim);
+		border: 1px solid var(--hub-violet-border);
 		color: rgba(255,255,255,0.85);
 	}
 
@@ -218,19 +218,19 @@
 		border: 1px solid rgba(255,255,255,0.1);
 		border-radius: 6px;
 		color: rgba(255,255,255,0.85);
-		font-family: ui-monospace, monospace;
+		font-family: var(--hub-font-mono);
 		font-size: 12px;
 		padding: 8px 10px;
 		resize: none;
 		outline: none;
 		transition: border-color 0.15s;
 	}
-	textarea:focus { border-color: rgba(139, 92, 246, 0.4); }
+	textarea:focus { border-color: var(--hub-violet-border); }
 	textarea::placeholder { color: rgba(255,255,255,0.2); }
 
 	button {
-		background: rgba(139, 92, 246, 0.25);
-		border: 1px solid rgba(139, 92, 246, 0.35);
+		background: var(--hub-violet-border);
+		border: 1px solid var(--hub-violet-border);
 		border-radius: 6px;
 		color: rgba(255,255,255,0.7);
 		font-size: 16px;
@@ -240,6 +240,6 @@
 		align-self: flex-end;
 		height: 38px;
 	}
-	button:hover:not(:disabled) { background: rgba(139, 92, 246, 0.4); color: white; }
+	button:hover:not(:disabled) { background: var(--hub-violet-border); color: white; }
 	button:disabled { opacity: 0.3; cursor: not-allowed; }
 </style>

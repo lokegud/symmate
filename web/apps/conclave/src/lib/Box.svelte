@@ -77,27 +77,25 @@
 <style>
 	.box {
 		position: absolute;
-		background: color-mix(in srgb, var(--tint) 6%, rgba(8, 8, 14, 0.55));
-		backdrop-filter: blur(18px);
-		-webkit-backdrop-filter: blur(18px);
-		border: 1px solid color-mix(in srgb, var(--tint) 30%, rgba(255,255,255,0.06));
-		border-radius: 10px;
+		background: color-mix(in srgb, var(--tint) 6%, var(--hub-glass-bg));
+		backdrop-filter: blur(var(--hub-glass-blur));
+		-webkit-backdrop-filter: blur(var(--hub-glass-blur));
+		border: 1px solid color-mix(in srgb, var(--tint) 30%, var(--hub-border));
+		border-radius: var(--hub-radius-lg);
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
-		box-shadow:
-			0 8px 32px rgba(0,0,0,0.4),
-			inset 0 1px 0 rgba(255,255,255,0.06);
+		box-shadow: var(--hub-shadow-box);
 		user-select: none;
 	}
 
 	.titlebar {
 		display: flex;
 		align-items: center;
-		gap: 8px;
-		padding: 8px 12px;
+		gap: var(--hub-space-2);
+		padding: var(--hub-space-2) var(--hub-space-3);
 		cursor: grab;
-		border-bottom: 1px solid color-mix(in srgb, var(--tint) 15%, rgba(255,255,255,0.04));
+		border-bottom: 1px solid color-mix(in srgb, var(--tint) 15%, var(--hub-border-subtle));
 		background: color-mix(in srgb, var(--tint) 8%, rgba(0,0,0,0.2));
 		flex-shrink: 0;
 	}
@@ -113,8 +111,8 @@
 	}
 
 	.title {
-		font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
-		font-size: 11px;
+		font-family: var(--hub-font-mono);
+		font-size: var(--hub-text-xs);
 		font-weight: 500;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
@@ -125,14 +123,14 @@
 	.close {
 		background: none;
 		border: none;
-		color: rgba(255,255,255,0.25);
+		color: var(--hub-text-subtle);
 		font-size: 16px;
 		line-height: 1;
 		cursor: pointer;
 		padding: 0 2px;
-		transition: color 0.15s;
+		transition: color var(--hub-duration-fast);
 	}
-	.close:hover { color: rgba(255,255,255,0.7); }
+	.close:hover { color: var(--hub-text); }
 
 	.content {
 		flex: 1;

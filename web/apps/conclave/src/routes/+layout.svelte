@@ -1,4 +1,5 @@
 <script lang="ts">
+	import '$lib/styles/tokens.css';
 	let { children } = $props();
 </script>
 
@@ -10,8 +11,8 @@
 		width: 100%;
 		height: 100%;
 		overflow: hidden;
-		background: #080810;
-		color: rgba(255,255,255,0.85);
+		background: var(--hub-bg);
+		color: var(--hub-text);
 	}
 	:global(::-webkit-scrollbar) { width: 4px; }
 	:global(::-webkit-scrollbar-track) { background: transparent; }

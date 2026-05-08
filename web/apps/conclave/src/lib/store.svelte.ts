@@ -1,4 +1,4 @@
-export type ModuleType = 'hub' | 'chat' | 'canvas';
+export type ModuleType = 'hub' | 'chat' | 'canvas' | 'presence' | 'stream' | 'decisions' | 'taskboard';
 
 export interface BoxState {
 	id: string;
@@ -81,3 +81,36 @@ class AgentStore {
 export const agentStore = new AgentStore();
 
 export const HUB_URL = '/api';
+
+// Keel's /api/cohort/state — richer merged state (hub + Sygil)
+export type CohortMember = {
+	id: string;
+	name: string;
+	fingerprint: string;
+	bindrune_url: string;
+	status: 'working' | 'idle' | 'offline';
+	task: string;
+	pane_cmd: string;
+	last_seen: string; // ISO 8601
+	source: 'hub' | 'sygil' | 'both';
+};
+
+export type ConclaveMessage = {
+	sender: string;
+	body: string;
+	ts: string; // ISO 8601
+};
+
+export async function fetchCohortState(): Promise<CohortMember[]> {
+	const r = await fetch(`${HUB_URL}/cohort/state`);
+	if (!r.ok) throw new Error(`cohort/state ${r.status}`);
+	const d = await r.json();
+	return d.members ?? [];
+}
+
+export async function fetchConclaveMessages(limit = 20): Promise<ConclaveMessage[]> {
+	const r = await fetch(`${HUB_URL}/conclave/messages?limit=${limit}`);
+	if (!r.ok) throw new Error(`conclave/messages ${r.status}`);
+	const d = await r.json();
+	return d.messages ?? [];
+}
