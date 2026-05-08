@@ -130,6 +130,8 @@ func chatHandler(hc *aeo.HostContext, brain Brain, sessions *Sessions, ff *Force
 			history, _ = store.RecentMessages(ctx, convID, historyLimit)
 		}
 
+		history = trimHistory(history, historyTokenCap)
+
 		// Append current user turn to history for the LLM, then persist it.
 		msgs := append(history, Message{Role: "user", Content: req.Message})
 		if store != nil {
@@ -310,4 +312,18 @@ func buildAgentCard(p *aeo.Profile) AgentCard {
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, "ok\n")
+}
+
+// trimHistory drops the oldest messages until estimated token count fits within cap.
+// Approximation: 1 token ≈ 4 characters.
+func trimHistory(msgs []Message, cap int) []Message {
+	total := 0
+	for _, m := range msgs {
+		total += len(m.Content) / 4
+	}
+	for len(msgs) > 0 && total > cap {
+		total -= len(msgs[0].Content) / 4
+		msgs = msgs[1:]
+	}
+	return msgs
 }

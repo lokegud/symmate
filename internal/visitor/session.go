@@ -14,7 +14,8 @@ const (
 	defaultTokenCap   = 5000
 	gcInterval        = 5 * time.Minute
 	sessionIdleMax    = 30 * time.Minute
-	historyLimit      = 20 // max messages passed to LLM as context
+	historyLimit      = 60   // 30 turns × 2 messages; trimmed further by historyTokenCap
+	historyTokenCap   = 8000 // approximate token budget for history (chars/4)
 )
 
 // Session holds per-IP rate limit, token usage, conversation state, and recognition state.
