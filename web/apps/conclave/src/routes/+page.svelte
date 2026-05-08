@@ -8,26 +8,12 @@
 	import ConversationStream from '$lib/modules/ConversationStream.svelte';
 	import DecisionLog from '$lib/modules/DecisionLog.svelte';
 	import TaskBoard from '$lib/modules/TaskBoard.svelte';
+	import SystemLog from '$lib/modules/SystemLog.svelte';
+	import ResourceMeter from '$lib/modules/ResourceMeter.svelte';
 	import { boxStore, agentStore, HUB_URL, type ModuleType, type Agent } from '$lib/store.svelte.js';
-	import type { PageData } from './$types';
 
-	let { data }: { data: PageData } = $props();
-
-	// SSE connection to hub server — overrides Sygil seed when Keel is live
+	// SSE connection to hub server
 	onMount(() => {
-		// Seed from Sygil registry; SSE will overwrite when Keel is live
-		const sygilAgents = data.sygilAgents;
-		if (sygilAgents?.length && agentStore.agents.length === 0) {
-			agentStore.set(sygilAgents.map(a => ({
-				id: a.fingerprint,
-				name: a.card?.name ?? a.fingerprint.slice(0, 8),
-				task: a.card?.description ?? '',
-				status: 'idle' as const,
-				todos: [],
-				chat_url: a.card_url,
-				last_seen: a.last_refreshed
-			})));
-		}
 		let es: EventSource;
 		let retryTimer: ReturnType<typeof setTimeout>;
 
@@ -45,6 +31,38 @@
 			};
 		}
 		connect();
+
+		// Mouse passthrough for Tauri HUD mode.
+		// When cursor is not over a .box, clicks pass through to the desktop.
+		// setIgnoreCursorEvents(true) on Linux kills ALL input to the window, so
+		// re-entry detection uses mousemove (fires while events are active) rather
+		// than polling a cursor-position API that doesn't exist in @tauri-apps/api 2.11.
+		// Re-entry after passthrough: cursor must cross a .box boundary before events
+		// re-enable — this works because mousemove still fires on the box as soon as
+		// the window regains hit-test ownership on that pixel region.
+		// TODO: revisit with tauri://cursor-moved event when available in a future release
+		async function setupPassthrough() {
+			const { getCurrentWindow } = await import('@tauri-apps/api/window');
+			const win = getCurrentWindow();
+			let passthrough = false;
+
+			document.addEventListener('mousemove', async (e) => {
+				const onBox = !!(e.target as HTMLElement)?.closest('.box');
+				if (onBox && passthrough) {
+					await win.setIgnoreCursorEvents(false);
+					passthrough = false;
+				} else if (!onBox && !passthrough) {
+					await win.setIgnoreCursorEvents(true);
+					passthrough = true;
+				}
+			}, { passive: true });
+		}
+
+		// Only activate in Tauri context
+		if (typeof window !== 'undefined' && '__TAURI__' in window) {
+			setupPassthrough();
+		}
+
 		return () => { es?.close(); clearTimeout(retryTimer); };
 	});
 
@@ -60,6 +78,8 @@
 		stream:    { title: 'Conclave',  tint: '#e8a878', w: 560, h: 420 },
 		decisions: { title: 'Decisions', tint: '#a78bfa', w: 440, h: 520 },
 		taskboard: { title: 'Round',     tint: '#f59e0b', w: 540, h: 240 },
+		syslog:    { title: 'Sys Log',   tint: '#6b7280', w: 520, h: 420 },
+		resources: { title: 'Resources', tint: '#e59e0b', w: 300, h: 220 },
 	};
 
 	function addBox() {
@@ -86,6 +106,8 @@
 		stream:    ConversationStream,
 		decisions: DecisionLog,
 		taskboard: TaskBoard,
+		syslog:    SystemLog,
+		resources: ResourceMeter,
 	};
 </script>
 
@@ -115,6 +137,8 @@
 					<option value="stream">Conclave Stream</option>
 					<option value="decisions">Decision Log</option>
 					<option value="taskboard">Round Board</option>
+					<option value="syslog">Sys Log</option>
+					<option value="resources">Resources</option>
 				</select>
 				<button class="btn-add" onclick={addBox}>Add</button>
 				<button class="btn-cancel" onclick={() => adding = false}>Cancel</button>
@@ -147,6 +171,11 @@
 			linear-gradient(90deg, var(--hub-grid-color) 1px, transparent 1px);
 		background-size: var(--hub-grid-size) var(--hub-grid-size);
 		pointer-events: none;
+	}
+
+	/* Grid is a cockpit depth cue; meaningless over real desktop pixels */
+	:global([data-hub-mode="hud"]) .grid-bg {
+		display: none;
 	}
 
 	.toolbar {
