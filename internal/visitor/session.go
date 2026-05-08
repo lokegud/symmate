@@ -74,11 +74,27 @@ func (s *Session) AddDeviceMatch() {
 	s.recognition.AddDevice()
 }
 
+// AddEpisodicMatch records an episodic probe outcome for this session.
+// confirmed=true means the visitor correctly recalled a real anchor.
+// confirmed=false means the visitor accepted a fabricated memory (impersonation flag).
+func (s *Session) AddEpisodicMatch(confirmed bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.recognition.AddEpisodic(confirmed)
+}
+
 // IsOwner returns true if recognition confidence exceeds the owner threshold.
 func (s *Session) IsOwner() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.recognition.IsOwner()
+}
+
+// RecognitionLevel returns the human-readable confidence tier for this session.
+func (s *Session) RecognitionLevel() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.recognition.ConfidenceLevel()
 }
 
 // Sessions manages per-IP visitor sessions.

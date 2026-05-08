@@ -136,10 +136,11 @@ func chatHandler(hc *aeo.HostContext, brain Brain, sessions *Sessions, ff *Force
 			_ = store.AppendMessage(ctx, convID, "user", req.Message)
 		}
 
-		// Inject owner mode into context if session is recognised.
+		// Inject owner mode and recognition level into context.
 		if sess.IsOwner() {
 			ctx = WithOwnerMode(ctx, true)
 		}
+		ctx = WithRecognitionLevel(ctx, sess.RecognitionLevel())
 
 		// Start SSE stream immediately so the browser sees the connection as live
 		// while we wait for the LLM (which may have high TTFT on large contexts).
@@ -201,6 +202,21 @@ func handleOwnerRecognition(w http.ResponseWriter, r *http.Request, req ChatRequ
 		}
 		// Not enrolled yet — no recognition possible
 		return false
+	}
+
+	// Episodic anchor registration: owner adds true memories for future probing.
+	// Format: ANCHOR <text describing a real shared memory>
+	const anchorPrefix = "ANCHOR "
+	if strings.HasPrefix(req.Message, anchorPrefix) && sess.IsOwner() {
+		anchor := strings.TrimSpace(strings.TrimPrefix(req.Message, anchorPrefix))
+		if anchor != "" {
+			cfg.AddEpisodicAnchor(anchor)
+			_ = ownerMgr.Save(cfg)
+			sse := NewSSEWriter(w)
+			sse.Send("Anchor stored. I'll use this to verify you next time.")
+			sse.Done()
+			return true
+		}
 	}
 
 	// Phrase check: only when not yet in owner mode for this session.

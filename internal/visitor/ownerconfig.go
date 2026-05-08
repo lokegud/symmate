@@ -12,13 +12,14 @@ import (
 
 // OwnerConfig is the persistent owner identity stored in <hostDir>/owner.json.
 type OwnerConfig struct {
-	Version    int      `json:"version"`
-	Enrolled   bool     `json:"enrolled"`
-	PhraseHash string   `json:"phrase_hash"`
-	Devices    []Device `json:"devices"`
+	Version         int      `json:"version"`
+	Enrolled        bool     `json:"enrolled"`
+	PhraseHash      string   `json:"phrase_hash"`
+	Devices         []Device `json:"devices"`
+	EpisodicAnchors []string `json:"episodic_anchors,omitempty"`
 	// ToolTags is the allowlist of tool tag prefixes for this satellite.
 	// Empty means all registered tools are available.
-	ToolTags   []string `json:"tool_tags,omitempty"`
+	ToolTags []string `json:"tool_tags,omitempty"`
 }
 
 // Device is an enrolled device fingerprint.
@@ -119,4 +120,30 @@ func (c *OwnerConfig) addDevice(hash string) {
 	if !c.KnownDevice(hash) {
 		c.Devices = append(c.Devices, Device{Hash: hash, EnrolledAt: time.Now()})
 	}
+}
+
+// AddEpisodicAnchor stores a true episodic memory during enrollment.
+// Anchors are stored verbatim; the Symmate uses them to probe future sessions.
+// Up to 5 anchors are kept (oldest replaced when cap is exceeded).
+func (c *OwnerConfig) AddEpisodicAnchor(content string) {
+	const maxAnchors = 5
+	if content == "" {
+		return
+	}
+	for _, a := range c.EpisodicAnchors {
+		if a == content {
+			return // deduplicate
+		}
+	}
+	c.EpisodicAnchors = append(c.EpisodicAnchors, content)
+	if len(c.EpisodicAnchors) > maxAnchors {
+		c.EpisodicAnchors = c.EpisodicAnchors[len(c.EpisodicAnchors)-maxAnchors:]
+	}
+}
+
+// GetEpisodicAnchors returns the stored true episodic anchors for probe selection.
+func (c *OwnerConfig) GetEpisodicAnchors() []string {
+	out := make([]string, len(c.EpisodicAnchors))
+	copy(out, c.EpisodicAnchors)
+	return out
 }
