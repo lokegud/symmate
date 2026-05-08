@@ -5,7 +5,6 @@ package owner
 
 import (
 	"bufio"
-	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -27,12 +26,19 @@ import (
 
 const tokenTTL = 24 * time.Hour
 
+var validProviders = map[string]bool{
+	"anthropic":    true,
+	"hermes":       true,
+	"openai-compat": true,
+}
+
 // Server is the owner API HTTP handler.
 type Server struct {
-	hostDir  string
-	ownerMgr *visitor.OwnerManager
-	db       *storage.DB
-	llmStore *llm.OverrideStore
+	hostDir       string
+	ownerMgr      *visitor.OwnerManager
+	db            *storage.DB
+	llmStore      *llm.OverrideStore
+	allowedOrigin string
 
 	mu       sync.Mutex
 	sessions map[string]time.Time // token → expiry
@@ -40,13 +46,23 @@ type Server struct {
 
 // New creates the owner API server.
 func New(hostDir string, ownerMgr *visitor.OwnerManager, db *storage.DB, llmStore *llm.OverrideStore) *Server {
-	return &Server{
-		hostDir:  hostDir,
-		ownerMgr: ownerMgr,
-		db:       db,
-		llmStore: llmStore,
-		sessions: make(map[string]time.Time),
+	s := &Server{
+		hostDir:       hostDir,
+		ownerMgr:      ownerMgr,
+		db:            db,
+		llmStore:      llmStore,
+		allowedOrigin: os.Getenv("OWNER_CORS_ORIGIN"),
+		sessions:      make(map[string]time.Time),
 	}
+	go func() {
+		t := time.NewTicker(time.Hour)
+		for range t.C {
+			s.mu.Lock()
+			s.gc()
+			s.mu.Unlock()
+		}
+	}()
+	return s
 }
 
 // Router returns the chi router for the owner API.
@@ -54,7 +70,7 @@ func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
-	r.Use(cors)
+	r.Use(s.cors)
 
 	// Auth — no token required.
 	r.Post("/auth/login", s.login)
@@ -140,12 +156,17 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	devices := 0
+	if cfg != nil {
+		devices = len(cfg.Devices)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"name":               name,
 		"enrolled":           cfg != nil && cfg.Enrolled,
 		"conversation_count": convCount,
-		"devices":            len(cfg.Devices),
+		"devices":            devices,
 	})
 }
 
@@ -174,15 +195,15 @@ func (s *Server) putPersonality(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Context != nil {
 		if err := os.WriteFile(filepath.Join(s.hostDir, "context.md"), []byte(*req.Context), 0644); err != nil {
-			jsonErr(w, "write failed", http.StatusInternalServerError)
 			log.Error().Err(err).Msg("owner: write context.md")
+			jsonErr(w, "write failed", http.StatusInternalServerError)
 			return
 		}
 	}
 	if req.Vertical != nil {
 		if err := os.WriteFile(filepath.Join(s.hostDir, "vertical.md"), []byte(*req.Vertical), 0644); err != nil {
-			jsonErr(w, "write failed", http.StatusInternalServerError)
 			log.Error().Err(err).Msg("owner: write vertical.md")
+			jsonErr(w, "write failed", http.StatusInternalServerError)
 			return
 		}
 	}
@@ -215,6 +236,12 @@ func (s *Server) putPolicy(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "invalid json", http.StatusBadRequest)
 		return
 	}
+	for _, tag := range req.ToolTags {
+		if strings.TrimSpace(tag) == "" {
+			jsonErr(w, "tool_tags must not contain empty strings", http.StatusBadRequest)
+			return
+		}
+	}
 	cfg, err := s.ownerMgr.Load()
 	if err != nil {
 		jsonErr(w, "load failed", http.StatusInternalServerError)
@@ -231,6 +258,8 @@ func (s *Server) putPolicy(w http.ResponseWriter, r *http.Request) {
 // --- Audit ---
 
 func (s *Server) getAudit(w http.ResponseWriter, r *http.Request) {
+	// TODO: stream instead of loading all into memory when audit.jsonl grows large;
+	// track in symmate-build.md decisions log under getAudit scalability.
 	q := r.URL.Query()
 	page, _ := strconv.Atoi(q.Get("page"))
 	if page < 1 {
@@ -305,14 +334,6 @@ func (s *Server) listConversations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type item struct {
-		ID            string  `json:"id"`
-		VisitorHandle *string `json:"visitor_handle,omitempty"`
-		Surface       string  `json:"surface"`
-		StartedAt     int64   `json:"started_at"`
-		EndedAt       *int64  `json:"ended_at,omitempty"`
-		Outcome       *string `json:"outcome,omitempty"`
-	}
 	out := make([]item, 0, len(convs))
 	for _, c := range convs {
 		out = append(out, item{
@@ -343,11 +364,6 @@ func (s *Server) getConversation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type msgItem struct {
-		Role    string `json:"role"`
-		Content string `json:"content"`
-		TS      int64  `json:"ts"`
-	}
 	out := make([]msgItem, 0, len(msgs))
 	for _, m := range msgs {
 		out = append(out, msgItem{Role: m.Role, Content: m.Content, TS: m.TS})
@@ -389,6 +405,10 @@ func (s *Server) putLLM(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonErr(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	if !validProviders[req.Provider] {
+		jsonErr(w, "invalid provider: must be anthropic, hermes, or openai-compat", http.StatusBadRequest)
 		return
 	}
 	cfg := &llm.OverrideConfig{
@@ -439,6 +459,21 @@ func (s *Server) gc() {
 	}
 }
 
+func (s *Server) cors(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.allowedOrigin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", s.allowedOrigin)
+			w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+		}
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func bearerToken(r *http.Request) string {
 	h := r.Header.Get("Authorization")
 	if after, ok := strings.CutPrefix(h, "Bearer "); ok {
@@ -466,19 +501,3 @@ func readFileOrEmpty(path string) (string, error) {
 	}
 	return string(data), err
 }
-
-func cors(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-// Ensure context import is used.
-var _ = context.Background
