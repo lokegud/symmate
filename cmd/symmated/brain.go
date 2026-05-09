@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"regexp"
 	"strings"
 	"time"
@@ -15,6 +16,29 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// emitTrace writes one TraceEntry after an LLM call completes.
+// toolsCalled may be nil for non-tool calls.
+func emitTrace(tl *visitor.TraceLogger, ctx context.Context, provider, model, tag string, sysPromptLen int, start time.Time, toolsCalled []string, callErr error) {
+	if tl == nil {
+		return
+	}
+	e := &visitor.TraceEntry{
+		Time:         start.UTC().Format(time.RFC3339),
+		Provider:     provider,
+		Model:        model,
+		Tag:          tag,
+		OwnerMode:    visitor.OwnerModeFromCtx(ctx),
+		HistoryLen:   visitor.HistoryLenFromCtx(ctx),
+		SysPromptLen: sysPromptLen,
+		ToolsCalled:  toolsCalled,
+		ResponseMS:   time.Since(start).Milliseconds(),
+	}
+	if callErr != nil {
+		e.Error = callErr.Error()
+	}
+	tl.Log(e)
+}
+
 type Brain struct {
 	loader   *personality.Loader
 	router   *llm.Router
@@ -23,6 +47,7 @@ type Brain struct {
 	hostDir  string
 	tools    *tool.Registry
 	toolTags []string // allowed tag prefixes; nil = all tools
+	trace    *visitor.TraceLogger
 }
 
 const ownerSystemPromptSuffix = `
@@ -67,6 +92,12 @@ func (b *Brain) Chat(ctx context.Context, msgs []visitor.Message) (<-chan string
 		llmMsgs = append(llmMsgs, llm.Message{Role: m.Role, Content: m.Content})
 	}
 
+	provider, model := b.router.Resolve(tag)
+	sysPromptLen := 0
+	if sysPrompt != "" {
+		sysPromptLen = len(sysPrompt)
+	}
+
 	if ownerMode {
 		// Non-streaming: lets us strip directives before the owner sees them.
 		ch := make(chan string, 1)
@@ -74,13 +105,16 @@ func (b *Brain) Chat(ctx context.Context, msgs []visitor.Message) (<-chan string
 			defer close(ch)
 			llmCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 			defer cancel()
+			start := time.Now()
 			var reply string
 			var err error
+			var toolsCalled []string
 			if len(toolDefs) > 0 {
-				reply, err = b.router.RouteWithTools(llmCtx, tag, llmMsgs, toolDefs, b.tools.Executor(b.toolTags...))
+				reply, toolsCalled, err = b.routeWithToolsTracked(llmCtx, tag, llmMsgs, toolDefs)
 			} else {
 				reply, err = b.router.Route(llmCtx, tag, llmMsgs)
 			}
+			emitTrace(b.trace, ctx, provider, model, tag, sysPromptLen, start, toolsCalled, err)
 			if err != nil {
 				select {
 				case <-ctx.Done():
@@ -106,8 +140,10 @@ func (b *Brain) Chat(ctx context.Context, msgs []visitor.Message) (<-chan string
 		defer close(ch)
 		llmCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 		defer cancel()
+		start := time.Now()
 		if len(toolDefs) > 0 {
-			reply, err := b.router.RouteWithTools(llmCtx, tag, llmMsgs, toolDefs, b.tools.Executor(b.toolTags...))
+			reply, toolsCalled, err := b.routeWithToolsTracked(llmCtx, tag, llmMsgs, toolDefs)
+			emitTrace(b.trace, ctx, provider, model, tag, sysPromptLen, start, toolsCalled, err)
 			if err != nil {
 				select {
 				case <-ctx.Done():
@@ -122,7 +158,9 @@ func (b *Brain) Chat(ctx context.Context, msgs []visitor.Message) (<-chan string
 			}
 			return
 		}
-		if err := b.router.RouteStream(llmCtx, tag, llmMsgs, ch); err != nil {
+		err := b.router.RouteStream(llmCtx, tag, llmMsgs, ch)
+		emitTrace(b.trace, ctx, provider, model, tag, sysPromptLen, start, nil, err)
+		if err != nil {
 			select {
 			case <-ctx.Done():
 			default:
@@ -131,6 +169,18 @@ func (b *Brain) Chat(ctx context.Context, msgs []visitor.Message) (<-chan string
 		}
 	}()
 	return ch, nil
+}
+
+// routeWithToolsTracked calls RouteWithTools with a wrapping executor that records
+// which tool names were invoked during the agentic loop.
+func (b *Brain) routeWithToolsTracked(ctx context.Context, tag string, msgs []llm.Message, toolDefs []llm.ToolDef) (reply string, called []string, err error) {
+	exec := b.tools.Executor(b.toolTags...)
+	wrappedExec := func(ctx context.Context, name string, args json.RawMessage) string {
+		called = append(called, name)
+		return exec(ctx, name, args)
+	}
+	reply, err = b.router.RouteWithTools(ctx, tag, msgs, toolDefs, wrappedExec)
+	return
 }
 
 // extractDirectives parses {symmate:set:key=value} patterns from reply,

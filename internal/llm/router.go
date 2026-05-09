@@ -65,6 +65,13 @@ func (r *Router) WithOverride(store *OverrideStore) {
 	r.overrideStore = store
 }
 
+// Resolve returns the provider name and model that would be selected for tag.
+// Useful for logging/telemetry without triggering an actual LLM call.
+func (r *Router) Resolve(tag string) (providerName, model string) {
+	_, m, pn := r.resolve(tag)
+	return pn, m
+}
+
 // Route sends messages to the correct provider for the given tag and returns the reply.
 func (r *Router) Route(ctx context.Context, tag string, messages []Message) (string, error) {
 	provider, model, providerName := r.resolve(tag)
