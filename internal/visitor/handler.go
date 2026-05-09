@@ -111,10 +111,11 @@ func chatHandler(hc *aeo.HostContext, brain Brain, sessions *Sessions, ff *Force
 			_ = store.AppendMessage(ctx, convID, "user", req.Message)
 		}
 
-		// Inject owner mode into context if session is recognised.
+		// Inject owner mode and history length into context for Brain telemetry.
 		if sess.IsOwner() {
 			ctx = WithOwnerMode(ctx, true)
 		}
+		ctx = WithHistoryLen(ctx, len(history))
 
 		// Start SSE stream immediately so the browser sees the connection as live
 		// while we wait for the LLM (which may have high TTFT on large contexts).

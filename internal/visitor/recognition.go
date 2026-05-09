@@ -46,3 +46,16 @@ func OwnerModeFromCtx(ctx context.Context) bool {
 	v, _ := ctx.Value(ownerCtxKey{}).(bool)
 	return v
 }
+
+type historyLenCtxKey struct{}
+
+// WithHistoryLen injects the history message count into the context.
+func WithHistoryLen(ctx context.Context, n int) context.Context {
+	return context.WithValue(ctx, historyLenCtxKey{}, n)
+}
+
+// HistoryLenFromCtx returns the history length stored in the context, or 0.
+func HistoryLenFromCtx(ctx context.Context) int {
+	n, _ := ctx.Value(historyLenCtxKey{}).(int)
+	return n
+}

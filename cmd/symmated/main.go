@@ -128,6 +128,15 @@ func main() {
 		Handler: healthMux,
 	}
 
+	// --- Test-trace logger (tailed by Loke during chat tests) ---
+	traceLog, err := visitor.NewTraceLogger(filepath.Join(cfg.Host.HostDir, "test-trace.jsonl"))
+	if err != nil {
+		l.Warn().Err(err).Msg("trace logger disabled — could not open test-trace.jsonl")
+	} else {
+		defer traceLog.Close()
+		l.Info().Str("path", filepath.Join(cfg.Host.HostDir, "test-trace.jsonl")).Msg("test-trace logging active")
+	}
+
 	// --- :7842 Visitor API ---
 	brain := &Brain{
 		hostDir:  cfg.Host.HostDir,
@@ -137,6 +146,7 @@ func main() {
 		grants:   []firewall.Grant{},
 		tools:    toolReg,
 		toolTags: ownerCfg.ToolTags,
+		trace:    traceLog,
 	}
 	sessions := visitor.NewSessions(cfg.Visitor.RatePerMin, cfg.Visitor.TokenCap)
 	var ff *visitor.Forcefield
