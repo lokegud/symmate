@@ -92,6 +92,7 @@ func (s *Server) Router() http.Handler {
 
 	r.Get("/sse", s.handleSSE)
 	r.Post("/message", s.handleMessage)
+	r.Get("/.well-known/mcp.json", s.handleWellKnown)
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, "ok\n")
@@ -222,6 +223,29 @@ func writeRPCError(w http.ResponseWriter, id json.RawMessage, code int, msg stri
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK) // JSON-RPC errors are still 200
 	json.NewEncoder(w).Encode(resp)
+}
+
+func (s *Server) handleWellKnown(w http.ResponseWriter, r *http.Request) {
+	type mcpDiscovery struct {
+		Name            string `json:"name"`
+		Version         string `json:"version"`
+		ProtocolVersion string `json:"protocolVersion"`
+		Transport       string `json:"transport"`
+		URL             string `json:"url,omitempty"`
+		Capabilities    struct {
+			Tools bool `json:"tools"`
+		} `json:"capabilities"`
+	}
+	d := mcpDiscovery{
+		Name:            s.tools.hc.Profile.Name,
+		Version:         "0.1.0",
+		ProtocolVersion: mcpProtocolVersion,
+		Transport:       "http+sse",
+		URL:             s.tools.hc.Profile.Endpoints.MCP,
+	}
+	d.Capabilities.Tools = true
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(d)
 }
 
 func newSessionID() string {
