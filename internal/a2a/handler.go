@@ -3,7 +3,6 @@ package a2a
 import (
 	"net/http"
 
-	sdk "github.com/a2aproject/a2a-go/v2/a2a"
 	"github.com/a2aproject/a2a-go/v2/a2asrv"
 )
 
@@ -22,11 +21,13 @@ type Handler struct {
 }
 
 // NewHandler builds the A2A handler from a card and an executor.
-func NewHandler(card *sdk.AgentCard, executor a2asrv.AgentExecutor) *Handler {
+// card must be the local *Card type (not sdk.AgentCard directly) so that
+// the top-level "url" field is included in the served JSON.
+func NewHandler(card *Card, executor a2asrv.AgentExecutor) *Handler {
 	rh := a2asrv.NewHandler(executor)
 	return &Handler{
 		rpc:  a2asrv.NewJSONRPCHandler(rh),
-		card: a2asrv.NewStaticAgentCardHandler(card),
+		card: staticCardHandler(card),
 	}
 }
 

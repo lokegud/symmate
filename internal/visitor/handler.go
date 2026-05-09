@@ -16,30 +16,6 @@ import (
 //go:embed chat.html
 var chatHTML []byte
 
-type AgentCard struct {
-	Name               string            `json:"name"`
-	Description        string            `json:"description"`
-	URL                string            `json:"url"`
-	Version            string            `json:"version"`
-	Capabilities       agentCapabilities `json:"capabilities"`
-	DefaultInputModes  []string          `json:"defaultInputModes"`
-	DefaultOutputModes []string          `json:"defaultOutputModes"`
-	Skills             []agentSkill      `json:"skills"`
-}
-
-type agentCapabilities struct {
-	Streaming              bool `json:"streaming"`
-	PushNotifications      bool `json:"pushNotifications"`
-	StateTransitionHistory bool `json:"stateTransitionHistory"`
-}
-
-type agentSkill struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Tags        []string `json:"tags"`
-}
-
 type ChatRequest struct {
 	Message       string `json:"message"`
 	VisitorHandle string `json:"visitor_handle,omitempty"`
@@ -64,7 +40,6 @@ func NewRouter(hc *aeo.HostContext, brain Brain, sessions *Sessions, ff *Forcefi
 	r.Post("/chat", chatHandler(hc, brain, sessions, ff, store, ownerMgr))
 	r.Get("/id", idHandler(hc.Profile))
 	r.Get("/llms.txt", llmsTxtHandler(hc))
-	r.Get("/.well-known/agent-card.json", agentCardHandler(hc.Profile))
 	r.Get("/health", healthHandler)
 
 	return r
@@ -291,38 +266,6 @@ func llmsTxtHandler(hc *aeo.HostContext) http.HandlerFunc {
 		}
 		fmt.Fprintf(&sb, "\nGenerated: %s\n", time.Now().UTC().Format(time.RFC3339))
 		fmt.Fprint(w, sb.String())
-	}
-}
-
-func agentCardHandler(p *aeo.Profile) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Cache-Control", "public, max-age=300")
-		json.NewEncoder(w).Encode(buildAgentCard(p))
-	}
-}
-
-func buildAgentCard(p *aeo.Profile) AgentCard {
-	a2aURL := p.Endpoints.A2A
-	if a2aURL == "" {
-		a2aURL = p.Endpoints.Visitor
-	}
-	return AgentCard{
-		Name:        p.Name,
-		Description: p.Description,
-		URL:         a2aURL,
-		Version:     "0.1",
-		Capabilities: agentCapabilities{
-			Streaming: true,
-		},
-		DefaultInputModes:  []string{"text/plain"},
-		DefaultOutputModes: []string{"text/plain"},
-		Skills: []agentSkill{{
-			ID:          "conversation",
-			Name:        "Conversation",
-			Description: "Conversational interface for visitors.",
-			Tags:        []string{"conversation", "general"},
-		}},
 	}
 }
 
