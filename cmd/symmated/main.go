@@ -156,7 +156,7 @@ func main() {
 	}
 
 	// --- A2A endpoint (default + optional Yggdrasil extra listener) ---
-	a2aCard := a2a.BuildCard(hc.Profile.Endpoints.A2A, hc.Profile.Name, hc.Profile.Description)
+	a2aCard := a2a.BuildCard(hc.Profile.Endpoints.A2A, hc.Profile.Endpoints.Visitor, hc.Profile.Name, hc.Profile.Description)
 	a2aExecutor := a2a.NewSymmateExecutor(personalityLoader, router, fw)
 	if sygilURL := os.Getenv("SYGIL_URL"); sygilURL != "" {
 		a2aExecutor.WithSygil(a2a.NewSygilClient(sygilURL))

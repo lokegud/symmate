@@ -66,33 +66,6 @@ func TestIDHandler(t *testing.T) {
 	}
 }
 
-func TestAgentCardHandler(t *testing.T) {
-	hc := testHostContext()
-	router := NewRouter(hc, BrainStub{}, NewSessions(0, 0), nil, nil, nil)
-
-	req := httptest.NewRequest(http.MethodGet, "/.well-known/agent-card.json", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", w.Code)
-	}
-
-	var card AgentCard
-	if err := json.Unmarshal(w.Body.Bytes(), &card); err != nil {
-		t.Fatalf("unmarshal agent card: %v", err)
-	}
-	if card.Name != "TestHost" {
-		t.Errorf("name = %q, want TestHost", card.Name)
-	}
-	if !card.Capabilities.Streaming {
-		t.Error("streaming should be true")
-	}
-	if len(card.Skills) == 0 {
-		t.Error("skills should be non-empty")
-	}
-}
-
 func TestLLMsTxtHandler(t *testing.T) {
 	hc := testHostContext()
 	router := NewRouter(hc, BrainStub{}, NewSessions(0, 0), nil, nil, nil)
