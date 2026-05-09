@@ -61,6 +61,12 @@
   --color-warm:           #D4895A;
   --color-warm-subtle:    #FAF0EB;
 
+  /* Symon — pink blob identity color */
+  --color-symon:          #FF85C8;
+  --color-symon-deep:     #E8609E;
+  --color-symon-light:    #FFD6EE;
+  --color-symon-subtle:   #FFF0F9;
+
   /* Semantic */
   --color-success:        #38956A;
   --color-warning:        #D48A2A;

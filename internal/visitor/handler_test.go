@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -196,4 +197,100 @@ type errorBrain struct{}
 
 func (errorBrain) Chat(_ context.Context, _ []Message) (<-chan string, error) {
 	return nil, fmt.Errorf("brain failed")
+}
+
+// recordingBrain records each call's message slice.
+type recordingBrain struct {
+	mu    sync.Mutex
+	calls [][]Message
+}
+
+func (b *recordingBrain) Chat(_ context.Context, msgs []Message) (<-chan string, error) {
+	b.mu.Lock()
+	cp := make([]Message, len(msgs))
+	copy(cp, msgs)
+	b.calls = append(b.calls, cp)
+	b.mu.Unlock()
+	ch := make(chan string, 1)
+	ch <- "ok"
+	close(ch)
+	return ch, nil
+}
+
+// memStore is an in-memory ConversationStore for tests.
+type memStore struct {
+	mu   sync.Mutex
+	msgs map[string][]Message
+}
+
+func newMemStore() *memStore {
+	return &memStore{msgs: make(map[string][]Message)}
+}
+
+func (m *memStore) EnsureConversation(_ context.Context, id, _ string, _ *string) error {
+	m.mu.Lock()
+	if _, ok := m.msgs[id]; !ok {
+		m.msgs[id] = nil
+	}
+	m.mu.Unlock()
+	return nil
+}
+
+func (m *memStore) RecentMessages(_ context.Context, convID string, limit int) ([]Message, error) {
+	m.mu.Lock()
+	all := m.msgs[convID]
+	m.mu.Unlock()
+	if len(all) > limit {
+		all = all[len(all)-limit:]
+	}
+	out := make([]Message, len(all))
+	copy(out, all)
+	return out, nil
+}
+
+func (m *memStore) AppendMessage(_ context.Context, convID, role, content string) error {
+	m.mu.Lock()
+	m.msgs[convID] = append(m.msgs[convID], Message{Role: role, Content: content})
+	m.mu.Unlock()
+	return nil
+}
+
+func TestChatHandler_Memory(t *testing.T) {
+	hc := testHostContext()
+	brain := &recordingBrain{}
+	store := newMemStore()
+	router := NewRouter(hc, brain, NewSessions(0, 0), nil, store, nil)
+
+	send := func(msg string) {
+		body := strings.NewReader(`{"message":` + `"` + msg + `"` + `}`)
+		req := httptest.NewRequest(http.MethodPost, "/chat", body)
+		req.Header.Set("Content-Type", "application/json")
+		req.RemoteAddr = "10.0.0.1:9999"
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("send %q: status = %d, want 200", msg, w.Code)
+		}
+	}
+
+	send("hello, my name is alice")
+	send("what is my name?")
+
+	brain.mu.Lock()
+	defer brain.mu.Unlock()
+
+	if len(brain.calls) < 2 {
+		t.Fatalf("expected 2 brain calls, got %d", len(brain.calls))
+	}
+	// Second call must include prior turns: user→"hello", assistant→"ok", user→"what"
+	second := brain.calls[1]
+	if len(second) < 3 {
+		t.Fatalf("second brain call: want ≥3 messages (history+current), got %d: %v", len(second), second)
+	}
+	if !strings.Contains(second[0].Content, "alice") {
+		t.Errorf("second call history[0] should contain 'alice', got %q", second[0].Content)
+	}
+	if second[1].Role != "assistant" {
+		t.Errorf("second call history[1] should be assistant turn, got role %q", second[1].Role)
+	}
 }
