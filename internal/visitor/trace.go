@@ -9,15 +9,16 @@ import (
 
 // TraceEntry is one JSONL record emitted per chat request.
 type TraceEntry struct {
-	Time         string   `json:"time"`                    // RFC3339
-	Provider     string   `json:"provider"`                // "anthropic" | "hermes" | "openai-compat"
-	Model        string   `json:"model"`                   // model ID
-	Tag          string   `json:"tag"`                     // LLM routing tag
-	OwnerMode    bool     `json:"owner_mode"`              // owner session
-	HistoryLen   int      `json:"history_len"`             // messages in context before current turn
-	SysPromptLen int      `json:"sys_prompt_len"`          // byte length of system prompt
+	Time         string   `json:"time"`                   // RFC3339
+	Provider     string   `json:"provider"`               // "anthropic" | "hermes" | "openai-compat"
+	Model        string   `json:"model"`                  // model ID
+	Tag          string   `json:"tag"`                    // LLM routing tag
+	OwnerMode    bool     `json:"owner_mode"`             // owner session
+	UserID       string   `json:"user_id,omitempty"`      // registered user, if any
+	HistoryLen   int      `json:"history_len"`            // messages in context before current turn
+	SysPromptLen int      `json:"sys_prompt_len"`         // byte length of system prompt
 	ToolsCalled  []string `json:"tools_called,omitempty"` // tool names invoked
-	ResponseMS   int64    `json:"response_ms"`             // wall time: LLM start → channel close
+	ResponseMS   int64    `json:"response_ms"`            // wall time: LLM start → channel close
 	Error        string   `json:"error,omitempty"`
 }
 

@@ -27,8 +27,8 @@ import (
 const tokenTTL = 24 * time.Hour
 
 var validProviders = map[string]bool{
-	"anthropic":    true,
-	"hermes":       true,
+	"anthropic":     true,
+	"hermes":        true,
 	"openai-compat": true,
 }
 
@@ -39,6 +39,7 @@ type Server struct {
 	db            *storage.DB
 	llmStore      *llm.OverrideStore
 	allowedOrigin string
+	toolGroups    []string // restricted tool groups that can be granted to users
 
 	mu       sync.Mutex
 	sessions map[string]time.Time // token → expiry
@@ -62,6 +63,12 @@ func New(hostDir string, ownerMgr *visitor.OwnerManager, db *storage.DB, llmStor
 			s.mu.Unlock()
 		}
 	}()
+	return s
+}
+
+// WithToolGroups sets the restricted tool groups the owner can toggle per user.
+func (s *Server) WithToolGroups(groups []string) *Server {
+	s.toolGroups = append([]string(nil), groups...)
 	return s
 }
 
@@ -95,6 +102,13 @@ func (s *Server) Router() http.Handler {
 
 		r.Get("/llm", s.getLLM)
 		r.Put("/llm", s.putLLM)
+
+		r.Get("/users", s.listUsers)
+		r.Put("/users/settings", s.putUserSettings)
+		r.Post("/users", s.createUser)
+		r.Patch("/users/{id}", s.patchUser)
+		r.Delete("/users/{id}", s.deleteUser)
+		r.Post("/users/{id}/token", s.rotateUserToken)
 	})
 
 	return r
@@ -242,13 +256,10 @@ func (s *Server) putPolicy(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	cfg, err := s.ownerMgr.Load()
-	if err != nil {
-		jsonErr(w, "load failed", http.StatusInternalServerError)
-		return
-	}
-	cfg.ToolTags = req.ToolTags
-	if err := s.ownerMgr.Save(cfg); err != nil {
+	if err := s.ownerMgr.Update(func(cfg *visitor.OwnerConfig) error {
+		cfg.ToolTags = req.ToolTags
+		return nil
+	}); err != nil {
 		jsonErr(w, "save failed", http.StatusInternalServerError)
 		return
 	}
@@ -463,7 +474,7 @@ func (s *Server) cors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s.allowedOrigin != "" {
 			w.Header().Set("Access-Control-Allow-Origin", s.allowedOrigin)
-			w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST, PATCH, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
 		}
 		if r.Method == http.MethodOptions {

@@ -20,6 +20,11 @@ type OwnerConfig struct {
 	// ToolTags is the allowlist of tool tag prefixes for this satellite.
 	// Empty means all registered tools are available.
 	ToolTags []string `json:"tool_tags,omitempty"`
+	// UsersEnabled is the master switch for registered-user access. When false,
+	// every non-owner caller is treated as an anonymous visitor (public tools only).
+	UsersEnabled bool `json:"users_enabled"`
+	// Users are non-owner people the owner has registered and granted tool groups.
+	Users []RegisteredUser `json:"users,omitempty"`
 }
 
 // Device is an enrolled device fingerprint.
@@ -48,15 +53,40 @@ func (m *OwnerManager) Load() (*OwnerConfig, error) {
 	return loadOwnerConfig(m.hostDir)
 }
 
-// Save atomically writes owner.json with 0600 permissions.
+// Save atomically writes owner.json with 0600 permissions (temp file + rename).
 func (m *OwnerManager) Save(cfg *OwnerConfig) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	return writeOwnerConfig(m.hostDir, cfg)
+}
+
+// Update loads owner.json, applies fn, and saves it while holding the lock, so
+// concurrent read-modify-write cycles (owner API vs. visitor chat) can't lose changes.
+// If fn returns an error nothing is written.
+func (m *OwnerManager) Update(fn func(*OwnerConfig) error) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cfg, err := loadOwnerConfig(m.hostDir)
+	if err != nil {
+		return err
+	}
+	if err := fn(cfg); err != nil {
+		return err
+	}
+	return writeOwnerConfig(m.hostDir, cfg)
+}
+
+func writeOwnerConfig(hostDir string, cfg *OwnerConfig) error {
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(m.hostDir, "owner.json"), data, 0600)
+	path := filepath.Join(hostDir, "owner.json")
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 // LoadOwnerConfig reads owner.json from hostDir; returns empty unenrolled config if absent.

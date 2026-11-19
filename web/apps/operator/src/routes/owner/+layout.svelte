@@ -8,6 +8,7 @@
 		{ href: '/owner', label: 'Dashboard', icon: 'home' },
 		{ href: '/owner/personality', label: 'Personality', icon: 'brain' },
 		{ href: '/owner/policy', label: 'Policy', icon: 'shield' },
+		{ href: '/owner/users', label: 'Users', icon: 'users' },
 		{ href: '/owner/audit', label: 'Audit', icon: 'file-text' },
 		{ href: '/owner/conversations', label: 'Conversations', icon: 'messages-square' }
 	];
@@ -39,6 +40,8 @@
 							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9.5 2a2.5 2.5 0 0 1 5 0v.5a2.5 2.5 0 0 1-5 0V2z"/><path d="M12 2.5V4"/><path d="M7 7.5a5 5 0 0 0 10 0"/><path d="M7 10a5 5 0 0 0 10 0"/><ellipse cx="12" cy="14" rx="7" ry="5"/><path d="M12 19v3"/></svg>
 						{:else if link.icon === 'shield'}
 							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+						{:else if link.icon === 'users'}
+							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
 						{:else if link.icon === 'file-text'}
 							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
 						{:else if link.icon === 'messages-square'}

@@ -9,12 +9,11 @@
 	$effect(() => { toolTags = (data.policy.tool_tags ?? []).join('\n'); });
 	let saving = $state(false);
 
+	// Must match the tags the runtime actually registers (internal/tool).
 	const KNOWN_TAGS = [
-		{ tag: 'web', desc: 'Web fetch and search tools' },
-		{ tag: 'datetime', desc: 'Date and time lookup' },
-		{ tag: 'calendar', desc: 'Calendar read/write' },
-		{ tag: 'email', desc: 'Email access (privacy-bound)' },
-		{ tag: 'files', desc: 'File system access' }
+		{ tag: 'time', desc: 'Date and time lookup' },
+		{ tag: 'net', desc: 'Web fetch and search' },
+		{ tag: 'engineering', desc: 'GitHub: PRs, issues, deploy risk, cycle time' }
 	];
 
 	function toggleTag(tag: string) {
@@ -88,7 +87,7 @@
 					placeholder="web&#10;datetime&#10;calendar"
 					disabled={saving}
 				></textarea>
-				<p class="hint">Prefix match — "web" allows all tools tagged "web" or "web.*". Empty = allow all.</p>
+				<p class="hint">Prefix match — "net" allows all tools tagged "net" or "net/…". Empty = allow all. This list limits everyone, including you; who may use restricted tools is set on the Users page.</p>
 			</div>
 
 			<div class="firewall-notice">

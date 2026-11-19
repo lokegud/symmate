@@ -148,6 +148,83 @@ export async function ownerPutLLM(token: string, cfg: Omit<LLMConfig, 'has_custo
 	if (!res.ok) throw new Error(`putLLM: ${res.status}`);
 }
 
+// --- Registered users (per-user tool access) ---
+
+export interface RegisteredUser {
+	id: string;
+	name: string;
+	enabled: boolean;
+	groups: string[];
+	created_at: string;
+	last_seen?: string;
+}
+
+export interface UsersData {
+	/** Master switch: when false every non-owner is an anonymous visitor. */
+	enabled: boolean;
+	/** Restricted tool groups that can be granted (e.g. "engineering"). */
+	available_groups: string[];
+	users: RegisteredUser[];
+}
+
+async function ownerJSON<T>(res: Response, label: string): Promise<T> {
+	if (!res.ok) {
+		let msg = `${label}: ${res.status}`;
+		try {
+			const body = await res.json();
+			if (body?.error) msg = `${label}: ${body.error}`;
+		} catch {
+			/* non-JSON error body */
+		}
+		throw new Error(msg);
+	}
+	return res.status === 204 ? (undefined as T) : res.json();
+}
+
+export async function ownerListUsers(token: string): Promise<UsersData> {
+	return ownerJSON(await ownerFetch(token, '/users'), 'listUsers');
+}
+
+export async function ownerSetUsersEnabled(token: string, enabled: boolean): Promise<void> {
+	return ownerJSON(
+		await ownerFetch(token, '/users/settings', { method: 'PUT', body: JSON.stringify({ enabled }) }),
+		'setUsersEnabled'
+	);
+}
+
+/** Returns the new user and its access token. The token is only ever shown here. */
+export async function ownerCreateUser(token: string, name: string, groups: string[]): Promise<{ user: RegisteredUser; token: string }> {
+	return ownerJSON(
+		await ownerFetch(token, '/users', { method: 'POST', body: JSON.stringify({ name, groups }) }),
+		'createUser'
+	);
+}
+
+export async function ownerUpdateUser(
+	token: string,
+	id: string,
+	patch: { name?: string; enabled?: boolean; groups?: string[] }
+): Promise<RegisteredUser> {
+	return ownerJSON(
+		await ownerFetch(token, `/users/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+		'updateUser'
+	);
+}
+
+export async function ownerRotateUserToken(token: string, id: string): Promise<{ token: string }> {
+	return ownerJSON(
+		await ownerFetch(token, `/users/${encodeURIComponent(id)}/token`, { method: 'POST' }),
+		'rotateUserToken'
+	);
+}
+
+export async function ownerDeleteUser(token: string, id: string): Promise<void> {
+	return ownerJSON(
+		await ownerFetch(token, `/users/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+		'deleteUser'
+	);
+}
+
 // Runtime ports — overridden by SYMMATE_VISITOR_PORT env var in server context
 const _visitorPort = (typeof process !== 'undefined' && process.env?.SYMMATE_VISITOR_PORT)
 	? parseInt(process.env.SYMMATE_VISITOR_PORT, 10)

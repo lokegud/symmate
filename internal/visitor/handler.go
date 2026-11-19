@@ -3,6 +3,7 @@ package visitor
 import (
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -20,9 +21,17 @@ type ChatRequest struct {
 	Message       string `json:"message"`
 	VisitorHandle string `json:"visitor_handle,omitempty"`
 	DeviceToken   string `json:"device_token,omitempty"`
+	// UserToken authenticates a registered (non-owner) user. May also be sent as
+	// the X-Symmate-User header. Ignored when user access is switched off.
+	UserToken string `json:"user_token,omitempty"`
 }
 
+// lastSeenInterval throttles how often a registered user's last_seen is written.
+const lastSeenInterval = time.Hour
+
 const minPhraseLen = 12
+
+var errAlreadyEnrolled = errors.New("owner already enrolled")
 
 // NewRouter builds the visitor API chi router.
 // ownerMgr may be nil — when nil, owner recognition is disabled.
@@ -116,6 +125,8 @@ func chatHandler(hc *aeo.HostContext, brain Brain, sessions *Sessions, ff *Force
 		// Inject owner mode, recognition level, and history length into context.
 		if sess.IsOwner() {
 			ctx = WithOwnerMode(ctx, true)
+		} else if u, ok := authenticateUser(r, req, ownerMgr); ok {
+			ctx = WithUser(ctx, u)
 		}
 		ctx = WithRecognitionLevel(ctx, sess.RecognitionLevel())
 		ctx = WithHistoryLen(ctx, len(history))
@@ -169,8 +180,13 @@ func handleOwnerRecognition(w http.ResponseWriter, r *http.Request, req ChatRequ
 			phrase := strings.TrimPrefix(req.Message, enrollPrefix)
 			phrase = strings.TrimSpace(phrase)
 			if len(phrase) >= minPhraseLen {
-				if err := cfg.Enroll(phrase, req.DeviceToken); err == nil {
-					_ = ownerMgr.Save(cfg)
+				err := ownerMgr.Update(func(c *OwnerConfig) error {
+					if c.Enrolled {
+						return errAlreadyEnrolled
+					}
+					return c.Enroll(phrase, req.DeviceToken)
+				})
+				if err == nil {
 					sse := NewSSEWriter(w)
 					sse.Send("Enrollment complete. Trigger phrase set and this device registered. I'll recognize you next time.")
 					sse.Done()
@@ -188,8 +204,10 @@ func handleOwnerRecognition(w http.ResponseWriter, r *http.Request, req ChatRequ
 	if strings.HasPrefix(req.Message, anchorPrefix) && sess.IsOwner() {
 		anchor := strings.TrimSpace(strings.TrimPrefix(req.Message, anchorPrefix))
 		if anchor != "" {
-			cfg.AddEpisodicAnchor(anchor)
-			_ = ownerMgr.Save(cfg)
+			_ = ownerMgr.Update(func(c *OwnerConfig) error {
+				c.AddEpisodicAnchor(anchor)
+				return nil
+			})
 			sse := NewSSEWriter(w)
 			sse.Send("Anchor stored. I'll use this to verify you next time.")
 			sse.Done()
@@ -204,8 +222,10 @@ func handleOwnerRecognition(w http.ResponseWriter, r *http.Request, req ChatRequ
 			sess.AddPhraseMatch()
 			// Auto-enroll new device when phrase matches
 			if req.DeviceToken != "" && !cfg.KnownDevice(req.DeviceToken) {
-				cfg.AddDevice(req.DeviceToken)
-				_ = ownerMgr.Save(cfg)
+				_ = ownerMgr.Update(func(c *OwnerConfig) error {
+					c.AddDevice(req.DeviceToken)
+					return nil
+				})
 			}
 			sse := NewSSEWriter(w)
 			sse.Send("Welcome back. Owner mode active for this session.")
@@ -215,6 +235,40 @@ func handleOwnerRecognition(w http.ResponseWriter, r *http.Request, req ChatRequ
 	}
 
 	return false
+}
+
+// authenticateUser resolves the request's user token to a registered user.
+// Returns false when there is no token, user access is off, or the user is unknown/disabled.
+func authenticateUser(r *http.Request, req ChatRequest, ownerMgr *OwnerManager) (UserInfo, bool) {
+	if ownerMgr == nil {
+		return UserInfo{}, false
+	}
+	token := req.UserToken
+	if token == "" {
+		token = r.Header.Get("X-Symmate-User")
+	}
+	if token == "" {
+		return UserInfo{}, false
+	}
+	cfg, err := ownerMgr.Load()
+	if err != nil {
+		return UserInfo{}, false
+	}
+	u := cfg.AuthenticateUser(token)
+	if u == nil {
+		return UserInfo{}, false
+	}
+	info := UserInfo{ID: u.ID, Name: u.Name, Groups: append([]string(nil), u.Groups...)}
+	if time.Since(u.LastSeen) > lastSeenInterval {
+		id := u.ID
+		_ = ownerMgr.Update(func(c *OwnerConfig) error {
+			if cu := c.User(id); cu != nil {
+				cu.LastSeen = time.Now().UTC()
+			}
+			return nil
+		})
+	}
+	return info, true
 }
 
 func idHandler(p *aeo.Profile) http.HandlerFunc {

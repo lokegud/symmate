@@ -28,6 +28,7 @@ func emitTrace(tl *visitor.TraceLogger, ctx context.Context, provider, model, ta
 		Model:        model,
 		Tag:          tag,
 		OwnerMode:    visitor.OwnerModeFromCtx(ctx),
+		UserID:       userIDFromCtx(ctx),
 		HistoryLen:   visitor.HistoryLenFromCtx(ctx),
 		SysPromptLen: sysPromptLen,
 		ToolsCalled:  toolsCalled,
@@ -46,8 +47,38 @@ type Brain struct {
 	grants   []firewall.Grant
 	hostDir  string
 	tools    *tool.Registry
-	toolTags []string // allowed tag prefixes; nil = all tools
+	ownerMgr *visitor.OwnerManager // source of the live tool_tags allowlist; may be nil
 	trace    *visitor.TraceLogger
+}
+
+// access decides which tools this caller may use:
+//   - verified owner      → every registered tool
+//   - registered user     → public tools + the groups the owner toggled on for them
+//   - anonymous visitor   → public tools only
+//
+// The satellite tool_tags allowlist (owner.json) is re-read per request so owner
+// API changes apply without a restart, and it narrows all three tiers.
+func (b *Brain) access(ctx context.Context) tool.Access {
+	var tags []string
+	if b.ownerMgr != nil {
+		if cfg, err := b.ownerMgr.Load(); err == nil {
+			tags = cfg.ToolTags
+		}
+	}
+	if visitor.OwnerModeFromCtx(ctx) {
+		return tool.OwnerAccess(tags)
+	}
+	if u, ok := visitor.UserFromCtx(ctx); ok {
+		return tool.Access{Tags: tags, Groups: u.Groups}
+	}
+	return tool.PublicAccess(tags)
+}
+
+func userIDFromCtx(ctx context.Context) string {
+	if u, ok := visitor.UserFromCtx(ctx); ok {
+		return u.ID
+	}
+	return ""
 }
 
 const ownerSystemPromptSuffix = `
@@ -76,12 +107,13 @@ func (b *Brain) Chat(ctx context.Context, msgs []visitor.Message) (<-chan string
 		sysPrompt += ownerSystemPromptSuffix
 	}
 
+	acc := b.access(ctx)
 	var toolDefs []llm.ToolDef
 	if b.tools != nil {
-		toolDefs = b.tools.Defs(b.toolTags...)
+		toolDefs = b.tools.DefsFor(acc)
 	}
 	if b.tools != nil && len(toolDefs) > 0 {
-		sysPrompt += b.tools.Skills(b.toolTags...)
+		sysPrompt += b.tools.SkillsFor(acc)
 	}
 
 	llmMsgs := make([]llm.Message, 0, len(msgs)+1)
@@ -110,7 +142,7 @@ func (b *Brain) Chat(ctx context.Context, msgs []visitor.Message) (<-chan string
 			var err error
 			var toolsCalled []string
 			if len(toolDefs) > 0 {
-				reply, toolsCalled, err = b.routeWithToolsTracked(llmCtx, tag, llmMsgs, toolDefs)
+				reply, toolsCalled, err = b.routeWithToolsTracked(llmCtx, tag, llmMsgs, toolDefs, acc)
 			} else {
 				reply, err = b.router.Route(llmCtx, tag, llmMsgs)
 			}
@@ -142,7 +174,7 @@ func (b *Brain) Chat(ctx context.Context, msgs []visitor.Message) (<-chan string
 		defer cancel()
 		start := time.Now()
 		if len(toolDefs) > 0 {
-			reply, toolsCalled, err := b.routeWithToolsTracked(llmCtx, tag, llmMsgs, toolDefs)
+			reply, toolsCalled, err := b.routeWithToolsTracked(llmCtx, tag, llmMsgs, toolDefs, acc)
 			emitTrace(b.trace, ctx, provider, model, tag, sysPromptLen, start, toolsCalled, err)
 			if err != nil {
 				select {
@@ -173,8 +205,8 @@ func (b *Brain) Chat(ctx context.Context, msgs []visitor.Message) (<-chan string
 
 // routeWithToolsTracked calls RouteWithTools with a wrapping executor that records
 // which tool names were invoked during the agentic loop.
-func (b *Brain) routeWithToolsTracked(ctx context.Context, tag string, msgs []llm.Message, toolDefs []llm.ToolDef) (reply string, called []string, err error) {
-	exec := b.tools.Executor(b.toolTags...)
+func (b *Brain) routeWithToolsTracked(ctx context.Context, tag string, msgs []llm.Message, toolDefs []llm.ToolDef, acc tool.Access) (reply string, called []string, err error) {
+	exec := b.tools.ExecutorFor(acc)
 	wrappedExec := func(ctx context.Context, name string, args json.RawMessage) string {
 		called = append(called, name)
 		return exec(ctx, name, args)

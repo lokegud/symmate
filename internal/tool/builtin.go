@@ -24,8 +24,9 @@ func DateTimeTool() Tool {
 		Execute: func(_ context.Context, _ json.RawMessage) string {
 			return time.Now().UTC().Format(time.RFC3339)
 		},
-		Skill: "- Use get_datetime to answer questions about the current date or time.",
-		Tags:  []string{"time"},
+		Skill:  "- Use get_datetime to answer questions about the current date or time.",
+		Tags:   []string{"time"},
+		Public: true,
 	}
 }
 
@@ -63,8 +64,9 @@ func FetchURLTool() Tool {
 			}
 			return string(body)
 		},
-		Skill: "- Use fetch_url to retrieve the content of a web page or API endpoint.",
-		Tags:  []string{"net/fetch"},
+		Skill:  "- Use fetch_url to retrieve the content of a web page or API endpoint.",
+		Tags:   []string{"net/fetch"},
+		Public: true,
 	}
 }
 
@@ -125,8 +127,9 @@ func SearchTool(endpoint string) Tool {
 			}
 			return sb.String()
 		},
-		Skill: "- Use web_search to find current information, news, or facts about any topic.",
-		Tags:  []string{"net/search", "research/find"},
+		Skill:  "- Use web_search to find current information, news, or facts about any topic.",
+		Tags:   []string{"net/search", "research/find"},
+		Public: true,
 	}
 }
 

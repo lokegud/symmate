@@ -15,6 +15,7 @@ import (
 	"github.com/loke/symmate/internal/audit"
 	"github.com/loke/symmate/internal/config"
 	"github.com/loke/symmate/internal/firewall"
+	"github.com/loke/symmate/internal/github"
 	"github.com/loke/symmate/internal/llm"
 	"github.com/loke/symmate/internal/logger"
 	"github.com/loke/symmate/internal/mcp"
@@ -58,7 +59,12 @@ func main() {
 	defer auditLogger.Close()
 
 	// --- Personality engine (hot-reload on context.md / vertical.md changes) ---
-	personalityLoader, err := personality.NewLoader(cfg.Host.HostDir)
+	// SYMMATE_CONSTITUTION overrides the default constitution path (/mnt/KB/...).
+	constitutionPath := personality.DefaultConstitutionPath
+	if p := os.Getenv("SYMMATE_CONSTITUTION"); p != "" {
+		constitutionPath = p
+	}
+	personalityLoader, err := personality.NewLoaderWith(cfg.Host.HostDir, constitutionPath)
 	if err != nil {
 		l.Fatal().Err(err).Str("hostDir", cfg.Host.HostDir).Msg("personality loader init failed")
 	}
@@ -82,14 +88,24 @@ func main() {
 		toolReg.Register(tool.SearchTool(searchURL))
 		l.Info().Str("search_url", searchURL).Msg("web_search tool enabled")
 	}
-	l.Info().Int("tools", toolReg.Len()).Msg("tool registry ready")
-
-	// --- Owner config (ToolTags allowlist) ---
-	ownerCfg, err := visitor.LoadOwnerConfig(cfg.Host.HostDir)
-	if err != nil {
-		l.Warn().Err(err).Msg("could not load owner config; all tools allowed")
-		ownerCfg = &visitor.OwnerConfig{}
+	// Restricted tools below are owner-only unless the owner grants their group
+	// to a registered user (owner API /users).
+	if os.Getenv("GITHUB_TOKEN") != "" || os.Getenv("GITHUB_REPO") != "" {
+		gh := github.FromEnv()
+		for _, t := range tool.GitHubTools(gh) {
+			toolReg.Register(t)
+		}
+		l.Info().Bool("authenticated", gh.Authenticated()).Str("default_repo", gh.DefaultRepo).Msg("github tools enabled")
 	}
+	if os.Getenv("SYMMATE_ENABLE_MOCK_TOOLS") == "1" {
+		for _, t := range tool.MockDepartmentTools() {
+			toolReg.Register(t)
+		}
+		l.Warn().Msg("mock department tools enabled — they return sample data, not real data")
+	}
+	l.Info().Int("tools", toolReg.Len()).Strs("restricted_groups", toolReg.RestrictedGroups()).Msg("tool registry ready")
+
+	ownerMgr := visitor.NewOwnerManager(cfg.Host.HostDir)
 
 	// --- AEO profile ---
 	// Per-surface public URL overrides (HTTPS in production per A2A spec §7.1).
@@ -145,7 +161,7 @@ func main() {
 		firewall: fw,
 		grants:   []firewall.Grant{},
 		tools:    toolReg,
-		toolTags: ownerCfg.ToolTags,
+		ownerMgr: ownerMgr,
 		trace:    traceLog,
 	}
 	sessions := visitor.NewSessions(cfg.Visitor.RatePerMin, cfg.Visitor.TokenCap)
@@ -155,11 +171,11 @@ func main() {
 	}
 	visitorServer := &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", cfg.Visitor.Port),
-		Handler: visitor.NewRouter(hc, brain, sessions, ff, storage.NewVisitorStore(db), visitor.NewOwnerManager(cfg.Host.HostDir)),
+		Handler: visitor.NewRouter(hc, brain, sessions, ff, storage.NewVisitorStore(db), ownerMgr),
 	}
 
 	// --- :7841 Owner API ---
-	ownerServer := owner.New(cfg.Host.HostDir, visitor.NewOwnerManager(cfg.Host.HostDir), db, llmStore)
+	ownerServer := owner.New(cfg.Host.HostDir, ownerMgr, db, llmStore).WithToolGroups(toolReg.RestrictedGroups())
 	ownerAPIServer := &http.Server{
 		Addr:    "127.0.0.1:7841",
 		Handler: ownerServer.Router(),
