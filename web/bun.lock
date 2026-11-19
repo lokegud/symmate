@@ -40,6 +40,9 @@
     "apps/platform": {
       "name": "@symmate/platform",
       "version": "0.0.1",
+      "dependencies": {
+        "@symmate/design-system": "workspace:*",
+      },
       "devDependencies": {
         "@sveltejs/adapter-auto": "^7.0.1",
         "@sveltejs/adapter-node": "^5.5.4",
