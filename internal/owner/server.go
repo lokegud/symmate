@@ -39,7 +39,7 @@ type Server struct {
 	db            *storage.DB
 	llmStore      *llm.OverrideStore
 	allowedOrigin string
-	toolGroups    []string // restricted tool groups that can be granted to users
+	toolGroups    func(allowedTags []string) []string // grantable groups under a tool_tags allowlist
 
 	mu       sync.Mutex
 	sessions map[string]time.Time // token → expiry
@@ -66,10 +66,23 @@ func New(hostDir string, ownerMgr *visitor.OwnerManager, db *storage.DB, llmStor
 	return s
 }
 
-// WithToolGroups sets the restricted tool groups the owner can toggle per user.
-func (s *Server) WithToolGroups(groups []string) *Server {
-	s.toolGroups = append([]string(nil), groups...)
+// WithToolGroups sets the source of grantable tool groups. It is called with the
+// current tool_tags allowlist so groups that allowlist blocks are never offered.
+func (s *Server) WithToolGroups(fn func(allowedTags []string) []string) *Server {
+	s.toolGroups = fn
 	return s
+}
+
+// grantableGroups returns the groups that would unlock at least one tool right now.
+func (s *Server) grantableGroups(cfg *visitor.OwnerConfig) []string {
+	if s.toolGroups == nil {
+		return []string{}
+	}
+	g := s.toolGroups(cfg.ToolTags)
+	if g == nil {
+		g = []string{}
+	}
+	return g
 }
 
 // Router returns the chi router for the owner API.

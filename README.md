@@ -62,8 +62,10 @@ DELETE /users/{id}
 ```
 
 A user sends their token as `user_token` in the `/chat` body or as the `X-Symmate-User` header.
-A tool spanning several groups needs all of them. `owner.json`'s `tool_tags` allowlist (Policy page)
-narrows everyone, including the owner, and is applied live.
+Each tool belongs to exactly one group (the prefix of its first tag), so every toggle unlocks a
+concrete set of tools. Only groups that would unlock something are offered: a group with no
+registered tools, or one fully blocked by the `tool_tags` allowlist (Policy page), doesn't appear.
+The allowlist narrows everyone, including the owner, and is applied live.
 
 ## Integrations
 

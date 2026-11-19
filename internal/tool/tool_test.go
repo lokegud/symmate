@@ -48,9 +48,9 @@ func TestAccessTiers(t *testing.T) {
 		{"anonymous", PublicAccess(nil), "datetime"},
 		{"owner", OwnerAccess(nil), "datetime,list_prs,deal_status,profile_360,untagged_restricted"},
 		{"user engineering", Access{Groups: []string{"engineering"}}, "datetime,list_prs"},
-		// profile_360 spans entity+sales+engineering: needs all three.
-		{"user eng+sales", Access{Groups: []string{"engineering", "sales"}}, "datetime,list_prs,deal_status"},
-		{"user all three", Access{Groups: []string{"engineering", "sales", "entity"}}, "datetime,list_prs,deal_status,profile_360"},
+		// profile_360's group is its first tag's prefix ("entity"); its other tags don't gate it.
+		{"user sales", Access{Groups: []string{"sales"}}, "datetime,deal_status"},
+		{"user entity", Access{Groups: []string{"entity"}}, "datetime,profile_360"},
 		{"satellite allowlist narrows owner", OwnerAccess([]string{"engineering"}), "list_prs,profile_360"},
 	}
 	for _, c := range cases {
@@ -73,10 +73,22 @@ func TestExecutorRefusesHiddenTools(t *testing.T) {
 	}
 }
 
-func TestRestrictedGroups(t *testing.T) {
-	got := strings.Join(testRegistry().RestrictedGroups(), ",")
-	if got != "engineering,entity,sales" {
+func TestGrantableGroups(t *testing.T) {
+	r := testRegistry()
+	// Every group offered unlocks at least one tool; the untagged tool adds none.
+	if got := strings.Join(r.GrantableGroups(nil), ","); got != "engineering,entity,sales" {
 		t.Errorf("got %q", got)
+	}
+	// A group the satellite allowlist blocks entirely is not offered.
+	if got := strings.Join(r.GrantableGroups([]string{"engineering"}), ","); got != "engineering,entity" {
+		t.Errorf("with allowlist: got %q", got)
+	}
+	// Each grantable group must change what a user can see (no dead toggles).
+	base := len(r.DefsFor(PublicAccess(nil)))
+	for _, g := range r.GrantableGroups(nil) {
+		if n := len(r.DefsFor(Access{Groups: []string{g}})); n <= base {
+			t.Errorf("toggling %q has no effect", g)
+		}
 	}
 }
 
@@ -105,7 +117,7 @@ func TestBuiltinsArePublicDepartmentToolsAreNot(t *testing.T) {
 		if tl.Public {
 			t.Errorf("%s must not be public", tl.Def.Name)
 		}
-		if len(tl.Groups()) == 0 {
+		if tl.Group() == "" {
 			t.Errorf("%s has no group", tl.Def.Name)
 		}
 	}

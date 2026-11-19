@@ -103,7 +103,7 @@ func main() {
 		}
 		l.Warn().Msg("mock department tools enabled — they return sample data, not real data")
 	}
-	l.Info().Int("tools", toolReg.Len()).Strs("restricted_groups", toolReg.RestrictedGroups()).Msg("tool registry ready")
+	l.Info().Int("tools", toolReg.Len()).Strs("grantable_groups", toolReg.GrantableGroups(nil)).Msg("tool registry ready")
 
 	ownerMgr := visitor.NewOwnerManager(cfg.Host.HostDir)
 
@@ -175,7 +175,7 @@ func main() {
 	}
 
 	// --- :7841 Owner API ---
-	ownerServer := owner.New(cfg.Host.HostDir, ownerMgr, db, llmStore).WithToolGroups(toolReg.RestrictedGroups())
+	ownerServer := owner.New(cfg.Host.HostDir, ownerMgr, db, llmStore).WithToolGroups(toolReg.GrantableGroups)
 	ownerAPIServer := &http.Server{
 		Addr:    "127.0.0.1:7841",
 		Handler: ownerServer.Router(),
