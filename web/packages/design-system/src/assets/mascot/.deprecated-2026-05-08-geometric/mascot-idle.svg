@@ -1,0 +1,178 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 380" role="img" aria-label="Symmate mascot, idle">
+  <defs>
+    <!-- Rainbow body gradient: blue crown → violet → rose → amber -->
+    <linearGradient id="g-body" x1="0.28" y1="0" x2="0.72" y2="1">
+      <stop offset="0%"   stop-color="#92A4F0"/>
+      <stop offset="18%"  stop-color="#AC80E8"/>
+      <stop offset="38%"  stop-color="#D07ACC"/>
+      <stop offset="58%"  stop-color="#E47E98"/>
+      <stop offset="78%"  stop-color="#ECA874"/>
+      <stop offset="100%" stop-color="#F2C85C"/>
+    </linearGradient>
+    <!-- Diagonal shimmer (iridescent cross-light) -->
+    <linearGradient id="g-shimmer" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="rgba(255,255,255,0.28)"/>
+      <stop offset="40%"  stop-color="rgba(255,255,255,0)"/>
+      <stop offset="60%"  stop-color="rgba(255,255,255,0)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0.14)"/>
+    </linearGradient>
+    <!-- Inner highlight (translucency / lit-from-within) -->
+    <radialGradient id="g-glow" cx="0.36" cy="0.24" r="0.60">
+      <stop offset="0%"   stop-color="rgba(255,255,255,0.52)"/>
+      <stop offset="42%"  stop-color="rgba(255,255,255,0.16)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <!-- Iris gradient -->
+    <radialGradient id="g-iris" cx="0.34" cy="0.28" r="0.68">
+      <stop offset="0%"   stop-color="#7A8EEC"/>
+      <stop offset="60%"  stop-color="#3A50C8"/>
+      <stop offset="100%" stop-color="#1E2A7A"/>
+    </radialGradient>
+    <!-- Internal bubble marks (cool) -->
+    <radialGradient id="g-bc" cx="0.38" cy="0.32" r="0.62">
+      <stop offset="0%"   stop-color="rgba(255,255,255,0.68)"/>
+      <stop offset="50%"  stop-color="rgba(180,155,240,0.22)"/>
+      <stop offset="100%" stop-color="rgba(120,100,220,0.04)"/>
+    </radialGradient>
+    <!-- Internal bubble marks (warm) -->
+    <radialGradient id="g-bw" cx="0.38" cy="0.32" r="0.62">
+      <stop offset="0%"   stop-color="rgba(255,255,255,0.62)"/>
+      <stop offset="50%"  stop-color="rgba(242,185,128,0.22)"/>
+      <stop offset="100%" stop-color="rgba(215,155,90,0.04)"/>
+    </radialGradient>
+    <!-- Body clip for inner marks -->
+    <clipPath id="body-clip">
+      <path d="M 160 65 C 192 60,232 88,246 138 C 258 182,255 232,238 272 C 220 308,188 320,160 320 C 132 320,100 308,82 272 C 65 232,62 182,74 138 C 88 88,128 60,160 65 Z"/>
+    </clipPath>
+    <!-- Prism aura filter -->
+    <filter id="f-aura" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5.5" result="blur"/>
+      <feColorMatrix in="blur" type="matrix"
+        values="0.85 0.05 0.10 0 0.04
+                0.05 0.65 0.10 0 0.08
+                0.10 0.05 0.90 0 0.10
+                0    0    0    0.5 0"
+        result="coloredBlur"/>
+      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <!-- Soft organic edge on body -->
+    <filter id="f-edge" x="-4%" y="-4%" width="108%" height="108%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="3" seed="7" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+
+  <!-- Ground shadow -->
+  <ellipse cx="160" cy="358" rx="70" ry="10" fill="rgba(130,95,200,0.10)"/>
+
+  <!-- === FLOATING OUTER BUBBLES === -->
+  <circle cx="44"  cy="90"  r="10"  fill="rgba(145,178,242,0.36)" stroke="rgba(188,215,255,0.52)" stroke-width="1.2"/>
+  <circle cx="28"  cy="142" r="6"   fill="rgba(215,155,240,0.30)" stroke="rgba(235,198,255,0.48)" stroke-width="0.9"/>
+  <circle cx="46"  cy="204" r="7.5" fill="rgba(240,178,138,0.30)" stroke="rgba(255,212,172,0.48)" stroke-width="0.9"/>
+  <circle cx="34"  cy="264" r="5"   fill="rgba(178,225,198,0.28)" stroke="rgba(208,245,222,0.48)" stroke-width="0.8"/>
+  <circle cx="278" cy="80"  r="12"  fill="rgba(165,200,242,0.34)" stroke="rgba(202,225,255,0.52)" stroke-width="1.2"/>
+  <circle cx="294" cy="150" r="6.5" fill="rgba(195,155,240,0.28)" stroke="rgba(222,192,255,0.48)" stroke-width="0.9"/>
+  <circle cx="286" cy="230" r="8.5" fill="rgba(240,198,138,0.28)" stroke="rgba(255,220,172,0.48)" stroke-width="0.9"/>
+  <circle cx="268" cy="300" r="5.5" fill="rgba(240,185,178,0.26)" stroke="rgba(255,215,208,0.48)" stroke-width="0.8"/>
+  <circle cx="78"  cy="308" r="6"   fill="rgba(182,222,208,0.26)" stroke="rgba(212,245,228,0.48)" stroke-width="0.8"/>
+  <circle cx="150" cy="18"  r="5"   fill="rgba(145,175,252,0.30)" stroke="rgba(182,202,255,0.48)" stroke-width="0.8"/>
+  <circle cx="188" cy="11"  r="3.5" fill="rgba(215,148,238,0.28)" stroke="rgba(238,192,255,0.48)" stroke-width="0.7"/>
+  <circle cx="240" cy="25"  r="4"   fill="rgba(240,195,148,0.28)" stroke="rgba(255,220,180,0.48)" stroke-width="0.7"/>
+
+  <!-- === BODY === -->
+  <g filter="url(#f-aura)">
+    <!-- Outer body (organic edge) -->
+    <path d="M 160 65 C 192 60,232 88,246 138 C 258 182,255 232,238 272 C 220 308,188 320,160 320 C 132 320,100 308,82 272 C 65 232,62 182,74 138 C 88 88,128 60,160 65 Z"
+      fill="url(#g-body)" opacity="0.93" filter="url(#f-edge)"/>
+    <!-- Shimmer overlay -->
+    <path d="M 160 65 C 192 60,232 88,246 138 C 258 182,255 232,238 272 C 220 308,188 320,160 320 C 132 320,100 308,82 272 C 65 232,62 182,74 138 C 88 88,128 60,160 65 Z"
+      fill="url(#g-shimmer)"/>
+    <!-- Inner translucency highlight -->
+    <path d="M 160 65 C 192 60,232 88,246 138 C 258 182,255 232,238 272 C 220 308,188 320,160 320 C 132 320,100 308,82 272 C 65 232,62 182,74 138 C 88 88,128 60,160 65 Z"
+      fill="url(#g-glow)"/>
+    <!-- Rim light upper-left -->
+    <path d="M 160 65 C 142 62,108 76,88 102 C 72 125,65 155,63 182"
+      fill="none" stroke="rgba(255,255,255,0.44)" stroke-width="6.5" stroke-linecap="round"/>
+  </g>
+
+  <!-- === LEFT FIN === -->
+  <path d="M 74 198 C 52 186,36 197,40 216 C 44 232,62 234,74 222"
+    fill="url(#g-body)" opacity="0.76"/>
+  <path d="M 74 198 C 52 186,36 197,40 216 C 44 232,62 234,74 222"
+    fill="url(#g-glow)" opacity="0.62"/>
+  <path d="M 72 200 C 54 192,44 202,47 217"
+    fill="none" stroke="rgba(255,255,255,0.30)" stroke-width="1.6" stroke-linecap="round"/>
+
+  <!-- === RIGHT FIN === -->
+  <path d="M 246 198 C 268 186,284 197,280 216 C 276 232,258 234,246 222"
+    fill="url(#g-body)" opacity="0.76"/>
+  <path d="M 246 198 C 268 186,284 197,280 216 C 276 232,258 234,246 222"
+    fill="url(#g-glow)" opacity="0.62"/>
+  <path d="M 248 200 C 266 192,276 202,273 217"
+    fill="none" stroke="rgba(255,255,255,0.30)" stroke-width="1.6" stroke-linecap="round"/>
+
+  <!-- === FEET === -->
+  <ellipse cx="133" cy="322" rx="25" ry="14" fill="url(#g-body)" opacity="0.85"/>
+  <ellipse cx="133" cy="322" rx="25" ry="14" fill="url(#g-glow)" opacity="0.55"/>
+  <ellipse cx="187" cy="322" rx="25" ry="14" fill="url(#g-body)" opacity="0.85"/>
+  <ellipse cx="187" cy="322" rx="25" ry="14" fill="url(#g-glow)" opacity="0.55"/>
+
+  <!-- === INTERNAL BUBBLE MARKS (clipped to body) === -->
+  <g clip-path="url(#body-clip)">
+    <circle cx="150" cy="232" r="21" fill="url(#g-bc)" opacity="0.58"/>
+    <circle cx="192" cy="258" r="15" fill="url(#g-bw)" opacity="0.52"/>
+    <circle cx="128" cy="272" r="11" fill="url(#g-bc)" opacity="0.46"/>
+    <circle cx="206" cy="225" r="9.5" fill="url(#g-bw)" opacity="0.44"/>
+    <circle cx="164" cy="290" r="8.5" fill="url(#g-bc)" opacity="0.40"/>
+    <circle cx="114" cy="250" r="7.5" fill="url(#g-bw)" opacity="0.36"/>
+    <circle cx="216" cy="275" r="7"  fill="url(#g-bc)" opacity="0.34"/>
+    <circle cx="174" cy="244" r="5.5" fill="url(#g-bw)" opacity="0.30"/>
+    <circle cx="138" cy="298" r="5"  fill="url(#g-bc)" opacity="0.28"/>
+  </g>
+
+  <!-- === HEAD CURL === -->
+  <path d="M 158 65 C 157 50,164 41,170 35 C 176 29,180 21,175 14"
+    fill="none" stroke="#A08AEC" stroke-width="4.8" stroke-linecap="round" opacity="0.88"/>
+  <path d="M 158 65 C 157 50,164 41,170 35 C 176 29,180 21,175 14"
+    fill="none" stroke="rgba(255,255,255,0.42)" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="175" cy="13" r="4.2" fill="#B090EC" opacity="0.90"/>
+  <circle cx="176" cy="12" r="1.9" fill="rgba(255,255,255,0.75)"/>
+
+  <!-- === LEFT EYE === -->
+  <g transform="translate(126,152)">
+    <circle r="27"  fill="white"  opacity="0.97"/>
+    <path d="M -27 0 A 27 27 0 0 1 27 0 L 22 -7 Q 0 -13 -22 -7 Z" fill="rgba(175,195,255,0.22)"/>
+    <circle cy="2"  r="18" fill="url(#g-iris)"/>
+    <circle cx="0.5" cy="3" r="11.5" fill="#141830"/>
+    <!-- Primary sparkle -->
+    <circle cx="-5" cy="-3" r="6.2" fill="white" opacity="0.97"/>
+    <!-- Secondary sparkle -->
+    <circle cx="7"  cy="-6" r="3.2" fill="white" opacity="0.84"/>
+    <!-- Micro sparkle -->
+    <circle cx="-9" cy="4" r="1.6" fill="rgba(255,255,255,0.52)"/>
+  </g>
+
+  <!-- === RIGHT EYE === -->
+  <g transform="translate(194,152)">
+    <circle r="27"  fill="white"  opacity="0.97"/>
+    <path d="M -27 0 A 27 27 0 0 1 27 0 L 22 -7 Q 0 -13 -22 -7 Z" fill="rgba(175,195,255,0.22)"/>
+    <circle cy="2"  r="18" fill="url(#g-iris)"/>
+    <circle cx="0.5" cy="3" r="11.5" fill="#141830"/>
+    <circle cx="-5" cy="-3" r="6.2" fill="white" opacity="0.97"/>
+    <circle cx="7"  cy="-6" r="3.2" fill="white" opacity="0.84"/>
+    <circle cx="-9" cy="4" r="1.6" fill="rgba(255,255,255,0.52)"/>
+  </g>
+
+  <!-- === CHEEK BLUSH === -->
+  <ellipse cx="103" cy="188" rx="18" ry="11" fill="rgba(240,155,140,0.24)"/>
+  <ellipse cx="217" cy="188" rx="18" ry="11" fill="rgba(240,155,140,0.24)"/>
+
+  <!-- === NOSE === -->
+  <circle cx="160" cy="196" r="4.2" fill="rgba(180,128,155,0.72)"/>
+
+  <!-- === MOUTH (idle — gentle smile) === -->
+  <path d="M 143 214 Q 160 234 177 214"
+    fill="none" stroke="rgba(165,108,138,0.90)" stroke-width="4" stroke-linecap="round"/>
+  <path d="M 149 217 Q 160 230 171 217"
+    fill="rgba(198,125,155,0.20)"/>
+</svg>

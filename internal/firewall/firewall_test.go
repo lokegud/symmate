@@ -63,7 +63,7 @@ func TestFilter_AskGrant_AuditEmitted(t *testing.T) {
 	text := "Call me at 415-555-1234"
 	_, dec := fw.Filter(context.Background(), text, grants)
 
-	if dec != DecisionAskOwner {
+	if dec != DecisionAskHost {
 		t.Errorf("expected ask-owner, got %s", dec)
 	}
 	if len(audit.asks) == 0 {
@@ -117,10 +117,10 @@ func TestRewrite_CoarseEmail(t *testing.T) {
 }
 
 func TestDecisionOrdering(t *testing.T) {
-	if DecisionAllow >= DecisionAskOwner {
+	if DecisionAllow >= DecisionAskHost {
 		t.Error("allow should be less than ask-owner")
 	}
-	if DecisionAskOwner >= DecisionDeny {
+	if DecisionAskHost >= DecisionDeny {
 		t.Error("ask-owner should be less than deny")
 	}
 }

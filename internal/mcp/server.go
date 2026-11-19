@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -67,9 +68,10 @@ type toolCallParams struct {
 // Server is the MCP HTTP+SSE server.
 // HTTP+SSE transport only — no stdio (OX Security RCE advisory, April 2026).
 type Server struct {
-	tools  *ToolRegistry
-	policy *CapabilityPolicy
-	audit  AuditLogger
+	tools        *ToolRegistry
+	policy       *CapabilityPolicy
+	audit        AuditLogger
+	publicMsgURL string // absolute message URL prefix when SYMMATE_MCP_PUBLIC_URL is set
 }
 
 // NewServer creates a MCP server for the given host context.
@@ -77,10 +79,15 @@ func NewServer(hc *aeo.HostContext, audit AuditLogger) *Server {
 	if audit == nil {
 		audit = NoopAuditLogger{}
 	}
+	var publicMsgURL string
+	if base := os.Getenv("SYMMATE_MCP_PUBLIC_URL"); base != "" {
+		publicMsgURL = base + "/message"
+	}
 	return &Server{
-		tools:  newToolRegistry(hc),
-		policy: DefaultPolicy(),
-		audit:  audit,
+		tools:        newToolRegistry(hc),
+		policy:       DefaultPolicy(),
+		audit:        audit,
+		publicMsgURL: publicMsgURL,
 	}
 }
 
@@ -92,6 +99,7 @@ func (s *Server) Router() http.Handler {
 
 	r.Get("/sse", s.handleSSE)
 	r.Post("/message", s.handleMessage)
+	r.Get("/.well-known/mcp.json", s.handleWellKnown)
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, "ok\n")
@@ -112,7 +120,11 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 	h.Set("Connection", "keep-alive")
 	h.Set("X-Accel-Buffering", "no")
 
-	msgURL := fmt.Sprintf("/message?sessionId=%s", sessionID)
+	msgBase := "/message"
+	if s.publicMsgURL != "" {
+		msgBase = s.publicMsgURL
+	}
+	msgURL := fmt.Sprintf("%s?sessionId=%s", msgBase, sessionID)
 	fmt.Fprintf(w, "event: endpoint\ndata: %s\n\n", msgURL)
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()
@@ -222,6 +234,29 @@ func writeRPCError(w http.ResponseWriter, id json.RawMessage, code int, msg stri
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK) // JSON-RPC errors are still 200
 	json.NewEncoder(w).Encode(resp)
+}
+
+func (s *Server) handleWellKnown(w http.ResponseWriter, r *http.Request) {
+	type mcpDiscovery struct {
+		Name            string `json:"name"`
+		Version         string `json:"version"`
+		ProtocolVersion string `json:"protocolVersion"`
+		Transport       string `json:"transport"`
+		URL             string `json:"url,omitempty"`
+		Capabilities    struct {
+			Tools bool `json:"tools"`
+		} `json:"capabilities"`
+	}
+	d := mcpDiscovery{
+		Name:            s.tools.hc.Profile.Name,
+		Version:         "0.1.0",
+		ProtocolVersion: mcpProtocolVersion,
+		Transport:       "http+sse",
+		URL:             s.tools.hc.Profile.Endpoints.MCP,
+	}
+	d.Capabilities.Tools = true
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(d)
 }
 
 func newSessionID() string {

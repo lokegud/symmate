@@ -43,11 +43,13 @@ func TestRouterTagRouting(t *testing.T) {
 		wantModel     string
 		wantProvName  string
 	}{
-		{TagDefault, anthropic, ModelSonnet, "anthropic"},
+		// Default and unknown routes to Hermes (privacy-first; commit 918cc73, 2026-05-07).
+		// Only explicit Light / HardReason tags reach Anthropic.
+		{TagDefault, hermes, "hermes", "hermes"},
 		{TagLight, anthropic, ModelHaiku, "anthropic"},
 		{TagHardReason, anthropic, ModelOpus, "anthropic"},
 		{TagPrivacyBound, hermes, "hermes", "hermes"},
-		{"unknown-tag", anthropic, ModelSonnet, "anthropic"},
+		{"unknown-tag", hermes, "hermes", "hermes"},
 	}
 
 	for _, tc := range tests {

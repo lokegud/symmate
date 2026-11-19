@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
 const anthropicDefaultEndpoint = "https://api.anthropic.com/v1/messages"
@@ -31,15 +32,30 @@ func NewAnthropicProviderAt(endpoint, apiKey string) *AnthropicProvider {
 }
 
 type anthropicRequest struct {
-	Model     string             `json:"model"`
-	MaxTokens int                `json:"max_tokens"`
-	System    string             `json:"system,omitempty"`
-	Messages  []anthropicMessage `json:"messages"`
+	Model        string             `json:"model"`
+	MaxTokens    int                `json:"max_tokens"`
+	System       string             `json:"system,omitempty"`
+	Messages     []anthropicMessage `json:"messages"`
+	Thinking     *thinkingConfig    `json:"thinking,omitempty"`
+	OutputConfig *outputConfigParam `json:"output_config,omitempty"`
 }
 
 type anthropicMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+}
+
+// thinkingConfig is the request-side thinking knob. On Opus 4.7 only "adaptive"
+// and "disabled" are accepted — the legacy {type:"enabled", budget_tokens:N}
+// form returns 400.
+type thinkingConfig struct {
+	Type string `json:"type"`
+}
+
+// outputConfigParam carries the GA effort knob. Supported on Opus 4.5+,
+// Opus 4.6, Opus 4.7, and Sonnet 4.6. Errors on Haiku 4.5.
+type outputConfigParam struct {
+	Effort string `json:"effort"`
 }
 
 type anthropicResponse struct {
@@ -72,9 +88,15 @@ func (p *AnthropicProvider) Complete(ctx context.Context, model string, messages
 
 	req := anthropicRequest{
 		Model:     model,
-		MaxTokens: 4096,
+		MaxTokens: 16000,
 		System:    system,
 		Messages:  turns,
+	}
+	// Opus 4.x and Sonnet 4.6 accept adaptive thinking + the GA effort knob.
+	// Haiku 4.5 returns 400 on `effort`, so skip both there.
+	if !strings.Contains(model, "haiku") {
+		req.Thinking = &thinkingConfig{Type: "adaptive"}
+		req.OutputConfig = &outputConfigParam{Effort: "high"}
 	}
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -110,5 +132,28 @@ func (p *AnthropicProvider) Complete(ctx context.Context, model string, messages
 	if len(ar.Content) == 0 {
 		return "", fmt.Errorf("empty content in response (status %d)", resp.StatusCode)
 	}
-	return ar.Content[0].Text, nil
+	// With adaptive thinking enabled the first block can be a `thinking` block
+	// (text empty by default on Opus 4.7); pick the first `text` block.
+	for _, c := range ar.Content {
+		if c.Type == "text" {
+			return c.Text, nil
+		}
+	}
+	return "", fmt.Errorf("no text block in response (status %d)", resp.StatusCode)
+}
+
+// Stream calls Complete and sends the full reply as a single token.
+// TODO: implement native Anthropic streaming when needed.
+func (p *AnthropicProvider) Stream(ctx context.Context, model string, messages []Message, out chan<- string) error {
+	defer close(out)
+	reply, err := p.Complete(ctx, model, messages)
+	if err != nil {
+		return err
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case out <- reply:
+	}
+	return nil
 }

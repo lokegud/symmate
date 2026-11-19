@@ -7,7 +7,7 @@ import (
 )
 
 // DefaultConstitutionPath is the canonical §A source on this host.
-const DefaultConstitutionPath = "/mnt/KB/claude/_protocol/symmate-prompts/symmate-system-v0.md"
+const DefaultConstitutionPath = "/mnt/KB/claude/_protocol/symmate-prompts/symmate-v1.md"
 
 // Compose assembles the three-layer system prompt from hostDir.
 // Reads §A from DefaultConstitutionPath, §B from <hostDir>/vertical.md (optional),
@@ -56,7 +56,7 @@ func compose(hostDir, constitution string) (string, error) {
 	return ComposeFromParts(constitution, vertical, context), nil
 }
 
-// LoadConstitution reads a symmate-system-v0.md file and extracts the §A block.
+// LoadConstitution reads a symmate-v1.md file and extracts the §A block.
 func LoadConstitution(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

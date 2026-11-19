@@ -1,7 +1,9 @@
 package visitor
 
 import (
+	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -12,55 +14,47 @@ import (
 	"github.com/loke/symmate/internal/aeo"
 )
 
-// AgentCard is the A2A Agent Card served at /.well-known/agent-card.json.
-// Read-only copy; the authoritative one is on the A2A port (7843).
-type AgentCard struct {
-	Name               string            `json:"name"`
-	Description        string            `json:"description"`
-	URL                string            `json:"url"`
-	Version            string            `json:"version"`
-	Capabilities       agentCapabilities `json:"capabilities"`
-	DefaultInputModes  []string          `json:"defaultInputModes"`
-	DefaultOutputModes []string          `json:"defaultOutputModes"`
-	Skills             []agentSkill      `json:"skills"`
-}
+//go:embed chat.html
+var chatHTML []byte
 
-type agentCapabilities struct {
-	Streaming              bool `json:"streaming"`
-	PushNotifications      bool `json:"pushNotifications"`
-	StateTransitionHistory bool `json:"stateTransitionHistory"`
-}
-
-type agentSkill struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Tags        []string `json:"tags"`
-}
-
-// ChatRequest is the body accepted by POST /chat.
 type ChatRequest struct {
 	Message       string `json:"message"`
 	VisitorHandle string `json:"visitor_handle,omitempty"`
+	DeviceToken   string `json:"device_token,omitempty"`
+	// UserToken authenticates a registered (non-owner) user. May also be sent as
+	// the X-Symmate-User header. Ignored when user access is switched off.
+	UserToken string `json:"user_token,omitempty"`
 }
 
+// lastSeenInterval throttles how often a registered user's last_seen is written.
+const lastSeenInterval = time.Hour
+
+const minPhraseLen = 12
+
+var errAlreadyEnrolled = errors.New("owner already enrolled")
+
 // NewRouter builds the visitor API chi router.
-// profile is pre-built; brain is stubbed until Forge merges.
-func NewRouter(hc *aeo.HostContext, brain Brain, sessions *Sessions) http.Handler {
+// ownerMgr may be nil — when nil, owner recognition is disabled.
+// store may be nil — when nil, conversation history is disabled.
+// forcefield may be nil — when nil, all messages pass through unchecked.
+func NewRouter(hc *aeo.HostContext, brain Brain, sessions *Sessions, ff *Forcefield, store ConversationStore, ownerMgr *OwnerManager) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 
-	r.Post("/chat", chatHandler(hc, brain, sessions))
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(chatHTML)
+	})
+	r.Post("/chat", chatHandler(hc, brain, sessions, ff, store, ownerMgr))
 	r.Get("/id", idHandler(hc.Profile))
 	r.Get("/llms.txt", llmsTxtHandler(hc))
-	r.Get("/.well-known/agent-card.json", agentCardHandler(hc.Profile))
 	r.Get("/health", healthHandler)
 
 	return r
 }
 
-func chatHandler(hc *aeo.HostContext, brain Brain, sessions *Sessions) http.HandlerFunc {
+func chatHandler(hc *aeo.HostContext, brain Brain, sessions *Sessions, ff *Forcefield, store ConversationStore, ownerMgr *OwnerManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sess := sessions.Get(r.RemoteAddr)
 		if !sess.Allow() {
@@ -78,18 +72,76 @@ func chatHandler(hc *aeo.HostContext, brain Brain, sessions *Sessions) http.Hand
 			return
 		}
 
-		msgs := []Message{
-			{Role: "user", Content: req.Message},
+		ctx := r.Context()
+
+		// --- Owner recognition (only when ownerMgr is configured) ---
+		if ownerMgr != nil {
+			if ownerAction := handleOwnerRecognition(w, r, req, sess, ownerMgr); ownerAction {
+				return
+			}
 		}
 
-		ctx := r.Context()
+		if ff != nil {
+			callerType := "human"
+			if r.Header.Get("X-A2A-Sender") != "" || r.Header.Get("Agent-Card") != "" {
+				callerType = "agent"
+			}
+			callerID := r.RemoteAddr
+			if handle := req.VisitorHandle; handle != "" {
+				callerID = handle
+			}
+			allow, reportID, _ := ff.Check(r.Context(), callerID, callerType, req.Message,
+				fmt.Sprintf("Symmate for %s", hc.Profile.Name))
+			if !allow {
+				sse := NewSSEWriter(w)
+				sse.Send(BlockedMessage(reportID))
+				sse.Done()
+				return
+			}
+		}
+
+		convID := sess.ConversationID()
+
+		// Ensure conversation row exists; load history.
+		var history []Message
+		if store != nil {
+			var handle *string
+			if req.VisitorHandle != "" {
+				h := req.VisitorHandle
+				handle = &h
+			}
+			_ = store.EnsureConversation(ctx, convID, "visitor", handle)
+			history, _ = store.RecentMessages(ctx, convID, historyLimit)
+		}
+
+		history = trimHistory(history, historyTokenCap)
+
+		// Append current user turn to history for the LLM, then persist it.
+		msgs := append(history, Message{Role: "user", Content: req.Message})
+		if store != nil {
+			_ = store.AppendMessage(ctx, convID, "user", req.Message)
+		}
+
+		// Inject owner mode, recognition level, and history length into context.
+		if sess.IsOwner() {
+			ctx = WithOwnerMode(ctx, true)
+		} else if u, ok := authenticateUser(r, req, ownerMgr); ok {
+			ctx = WithUser(ctx, u)
+		}
+		ctx = WithRecognitionLevel(ctx, sess.RecognitionLevel())
+		ctx = WithHistoryLen(ctx, len(history))
+
+		// Start SSE stream immediately so the browser sees the connection as live
+		// while we wait for the LLM (which may have high TTFT on large contexts).
+		sse := NewSSEWriter(w)
+
 		ch, err := brain.Chat(ctx, msgs)
 		if err != nil {
-			http.Error(w, "brain error", http.StatusInternalServerError)
+			sse.Send("(error: brain unavailable)")
+			sse.Done()
 			return
 		}
-
-		sse := NewSSEWriter(w)
+		var reply strings.Builder
 		for token := range ch {
 			if ctx.Err() != nil {
 				return
@@ -97,10 +149,126 @@ func chatHandler(hc *aeo.HostContext, brain Brain, sessions *Sessions) http.Hand
 			if err := sse.Send(token); err != nil {
 				return
 			}
+			reply.WriteString(token)
 			sess.AddTokens(len(token))
 		}
 		sse.Done()
+
+		if store != nil && reply.Len() > 0 {
+			_ = store.AppendMessage(ctx, convID, "assistant", reply.String())
+		}
 	}
+}
+
+// handleOwnerRecognition processes enrollment and phrase-check logic.
+// Returns true if the request was fully handled (response written) and no further processing needed.
+func handleOwnerRecognition(w http.ResponseWriter, r *http.Request, req ChatRequest, sess *Session, ownerMgr *OwnerManager) bool {
+	cfg, err := ownerMgr.Load()
+	if err != nil {
+		return false // config unreadable — skip recognition, don't break visitors
+	}
+
+	// Check device fingerprint before processing the message.
+	if req.DeviceToken != "" && cfg.Enrolled && cfg.KnownDevice(req.DeviceToken) {
+		sess.AddDeviceMatch()
+	}
+
+	// Enrollment: only when not yet enrolled and message starts with "ENROLL ".
+	if !cfg.Enrolled {
+		const enrollPrefix = "ENROLL "
+		if strings.HasPrefix(req.Message, enrollPrefix) {
+			phrase := strings.TrimPrefix(req.Message, enrollPrefix)
+			phrase = strings.TrimSpace(phrase)
+			if len(phrase) >= minPhraseLen {
+				err := ownerMgr.Update(func(c *OwnerConfig) error {
+					if c.Enrolled {
+						return errAlreadyEnrolled
+					}
+					return c.Enroll(phrase, req.DeviceToken)
+				})
+				if err == nil {
+					sse := NewSSEWriter(w)
+					sse.Send("Enrollment complete. Trigger phrase set and this device registered. I'll recognize you next time.")
+					sse.Done()
+					return true
+				}
+			}
+		}
+		// Not enrolled yet — no recognition possible
+		return false
+	}
+
+	// Episodic anchor registration: owner adds true memories for future probing.
+	// Format: ANCHOR <text describing a real shared memory>
+	const anchorPrefix = "ANCHOR "
+	if strings.HasPrefix(req.Message, anchorPrefix) && sess.IsOwner() {
+		anchor := strings.TrimSpace(strings.TrimPrefix(req.Message, anchorPrefix))
+		if anchor != "" {
+			_ = ownerMgr.Update(func(c *OwnerConfig) error {
+				c.AddEpisodicAnchor(anchor)
+				return nil
+			})
+			sse := NewSSEWriter(w)
+			sse.Send("Anchor stored. I'll use this to verify you next time.")
+			sse.Done()
+			return true
+		}
+	}
+
+	// Phrase check: only when not yet in owner mode for this session.
+	if !sess.IsOwner() {
+		candidate := strings.TrimSpace(req.Message)
+		if cfg.CheckPhrase(candidate) {
+			sess.AddPhraseMatch()
+			// Auto-enroll new device when phrase matches
+			if req.DeviceToken != "" && !cfg.KnownDevice(req.DeviceToken) {
+				_ = ownerMgr.Update(func(c *OwnerConfig) error {
+					c.AddDevice(req.DeviceToken)
+					return nil
+				})
+			}
+			sse := NewSSEWriter(w)
+			sse.Send("Welcome back. Owner mode active for this session.")
+			sse.Done()
+			return true
+		}
+	}
+
+	return false
+}
+
+// authenticateUser resolves the request's user token to a registered user.
+// Returns false when there is no token, user access is off, or the user is unknown/disabled.
+func authenticateUser(r *http.Request, req ChatRequest, ownerMgr *OwnerManager) (UserInfo, bool) {
+	if ownerMgr == nil {
+		return UserInfo{}, false
+	}
+	token := req.UserToken
+	if token == "" {
+		token = r.Header.Get("X-Symmate-User")
+	}
+	if token == "" {
+		return UserInfo{}, false
+	}
+	cfg, err := ownerMgr.Load()
+	if err != nil {
+		return UserInfo{}, false
+	}
+	u := cfg.AuthenticateUser(token)
+	if u == nil {
+		return UserInfo{}, false
+	}
+	info := UserInfo{ID: u.ID, Name: u.Name, Groups: append([]string(nil), u.Groups...)}
+	if time.Since(u.LastSeen) > lastSeenInterval {
+		id := u.ID
+		_ = ownerMgr.Update(func(c *OwnerConfig) error {
+			if cu := c.User(id); cu != nil {
+				cu.LastSeen = time.Now().UTC()
+			}
+			return nil
+		})
+	}
+	return info, true
 }
 
 func idHandler(p *aeo.Profile) http.HandlerFunc {
@@ -120,7 +288,6 @@ func llmsTxtHandler(hc *aeo.HostContext) http.HandlerFunc {
 		var sb strings.Builder
 		fmt.Fprintf(&sb, "# %s\n\n", p.Name)
 		fmt.Fprintf(&sb, "> %s\n\n", p.Description)
-
 		if p.Contact.Location != "" {
 			fmt.Fprintf(&sb, "Location: %s\n", p.Contact.Location)
 		}
@@ -129,13 +296,11 @@ func llmsTxtHandler(hc *aeo.HostContext) http.HandlerFunc {
 		}
 		fmt.Fprintf(&sb, "Host type: %s\n", p.HostType)
 		fmt.Fprintf(&sb, "Schema version: %s\n\n", p.SchemaVer)
-
 		fmt.Fprintf(&sb, "## Capabilities\n\n")
 		for _, c := range p.Capabilities {
 			fmt.Fprintf(&sb, "- %s\n", c)
 		}
 		fmt.Fprintln(&sb)
-
 		if hc.Hours != "" {
 			fmt.Fprintf(&sb, "## Availability\n\n%s\n\n", hc.Hours)
 		}
@@ -145,7 +310,6 @@ func llmsTxtHandler(hc *aeo.HostContext) http.HandlerFunc {
 		if hc.Policies != "" {
 			fmt.Fprintf(&sb, "## Policies\n\n%s\n\n", hc.Policies)
 		}
-
 		fmt.Fprintf(&sb, "## Agent Endpoints\n\n")
 		fmt.Fprintf(&sb, "Visitor API: %s\n", p.Endpoints.Visitor)
 		if p.Endpoints.MCP != "" {
@@ -155,52 +319,25 @@ func llmsTxtHandler(hc *aeo.HostContext) http.HandlerFunc {
 			fmt.Fprintf(&sb, "A2A endpoint: %s\n", p.Endpoints.A2A)
 		}
 		fmt.Fprintf(&sb, "\nGenerated: %s\n", time.Now().UTC().Format(time.RFC3339))
-
 		fmt.Fprint(w, sb.String())
-	}
-}
-
-func agentCardHandler(p *aeo.Profile) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		card := buildAgentCard(p)
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Cache-Control", "public, max-age=300")
-		json.NewEncoder(w).Encode(card)
-	}
-}
-
-func buildAgentCard(p *aeo.Profile) AgentCard {
-	skills := []agentSkill{
-		{
-			ID:          "conversation",
-			Name:        "Conversation",
-			Description: "Conversational interface for visitors.",
-			Tags:        []string{"conversation", "general"},
-		},
-	}
-
-	a2aURL := p.Endpoints.A2A
-	if a2aURL == "" {
-		a2aURL = p.Endpoints.Visitor
-	}
-
-	return AgentCard{
-		Name:        p.Name,
-		Description: p.Description,
-		URL:         a2aURL,
-		Version:     "0.1",
-		Capabilities: agentCapabilities{
-			Streaming:              true,
-			PushNotifications:      false,
-			StateTransitionHistory: false,
-		},
-		DefaultInputModes:  []string{"text/plain"},
-		DefaultOutputModes: []string{"text/plain"},
-		Skills:             skills,
 	}
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, "ok\n")
+}
+
+// trimHistory drops the oldest messages until estimated token count fits within cap.
+// Approximation: 1 token ≈ 4 characters.
+func trimHistory(msgs []Message, cap int) []Message {
+	total := 0
+	for _, m := range msgs {
+		total += len(m.Content) / 4
+	}
+	for len(msgs) > 0 && total > cap {
+		total -= len(msgs[0].Content) / 4
+		msgs = msgs[1:]
+	}
+	return msgs
 }

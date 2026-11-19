@@ -1,0 +1,175 @@
+/*
+ * Conclave Hub — Design Tokens
+ * Wren / Mox.Design — 2026-05-07
+ *
+ * SCOPE: internal command substrate. Not the public symmate.com surface.
+ * These tokens intentionally diverge from DESIGN.md (warm vellum) in favor
+ * of a dark, monospace-first, crisp aesthetic. The Hub is the cockpit.
+ *
+ * Derived from:
+ *   - /home/mox/symmate/web/DESIGN.md (spacing, type scale inherited)
+ *   - /mnt/KB/symmates/loke/docs/identity/sygil/bindrune-v2.md (state colors)
+ *   - Symon campaign metallic blue palette (electric accent)
+ */
+
+:root {
+  /* ------------------------------------------------------------------ */
+  /* Surfaces — dark void substrate                                       */
+  /* ------------------------------------------------------------------ */
+  --hub-bg:               #080810;  /* void — matches existing shell */
+  --hub-surface:          rgba(12, 12, 22, 0.85);
+  --hub-surface-raised:   rgba(16, 16, 28, 0.90);
+  --hub-surface-overlay:  rgba(8, 8, 16, 0.92);
+
+  /* Frosted glass (boxes) */
+  --hub-glass-blur:       18px;
+  --hub-glass-bg:         rgba(8, 8, 14, 0.55);
+
+  /* ------------------------------------------------------------------ */
+  /* Text                                                                */
+  /* ------------------------------------------------------------------ */
+  --hub-text:             rgba(255, 255, 255, 0.88);
+  --hub-text-muted:       rgba(255, 255, 255, 0.50);
+  --hub-text-subtle:      rgba(255, 255, 255, 0.28);
+  --hub-text-disabled:    rgba(255, 255, 255, 0.16);
+
+  /* ------------------------------------------------------------------ */
+  /* Borders                                                             */
+  /* ------------------------------------------------------------------ */
+  --hub-border:           rgba(255, 255, 255, 0.08);
+  --hub-border-subtle:    rgba(255, 255, 255, 0.05);
+  --hub-border-strong:    rgba(255, 255, 255, 0.14);
+
+  /* ------------------------------------------------------------------ */
+  /* Accent — electric blue (prism crown, sharpened for dark)            */
+  /* ------------------------------------------------------------------ */
+  --hub-accent:           #4a9eff;  /* matches bindrune-v2 clean ring */
+  --hub-accent-hover:     #6ab4ff;
+  --hub-accent-dim:       rgba(74, 158, 255, 0.15);
+  --hub-accent-border:    rgba(74, 158, 255, 0.35);
+
+  /* Violet — chat/comms channel                                         */
+  --hub-violet:           #8b5cf6;
+  --hub-violet-dim:       rgba(139, 92, 246, 0.18);
+  --hub-violet-border:    rgba(139, 92, 246, 0.35);
+
+  /* Teal — canvas/working state                                         */
+  --hub-teal:             #10b981;
+  --hub-teal-dim:         rgba(16, 185, 129, 0.15);
+  --hub-teal-border:      rgba(16, 185, 129, 0.30);
+
+  /* ------------------------------------------------------------------ */
+  /* Agent state colors — bindrune-v2 semantics                          */
+  /* Used for status dots, ring strokes, and aura glows                 */
+  /* Source: /mnt/KB/symmates/loke/docs/identity/sygil/bindrune-v2.md   */
+  /* ------------------------------------------------------------------ */
+  --state-unknown:        #c0c0c0;
+  --state-unknown-ring:   #555555;
+
+  --state-clean:          #e8e8e8;
+  --state-clean-ring:     #4a9eff;
+  --state-clean-aura:     rgba(74, 158, 255, 0.15);
+
+  --state-working:        #10b981;    /* active/working agent */
+  --state-working-ring:   #10b981;
+  --state-working-aura:   rgba(16, 185, 129, 0.18);
+
+  --state-blocked:        #f59e0b;
+  --state-blocked-ring:   #cc4422;
+  --state-blocked-aura:   rgba(245, 158, 11, 0.20);
+
+  --state-idle:           #6b7280;
+  --state-idle-ring:      #444444;
+
+  --state-done:           #4a9eff;
+  --state-done-ring:      #4a9eff;
+  --state-done-aura:      rgba(74, 158, 255, 0.12);
+
+  --state-trusted:        #ffd700;
+  --state-trusted-ring:   #997700;
+  --state-trusted-aura:   rgba(255, 215, 0, 0.18);
+
+  --state-revoked:        #606060;
+  --state-revoked-ring:   #333333;
+
+  /* ------------------------------------------------------------------ */
+  /* Typography — monospace-first (internal tool)                        */
+  /* Body text uses JetBrains Mono; decorative moments use Plus Jakarta  */
+  /* ------------------------------------------------------------------ */
+  --hub-font-mono:   'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  --hub-font-ui:     'Plus Jakarta Sans', system-ui, sans-serif;
+
+  /* Conclave does NOT use Fraunces — that's the public face */
+
+  /* Type scale — inherited from DESIGN.md, subset used here */
+  --hub-text-2xs:  0.625rem;   /* 10px — status labels, timestamps */
+  --hub-text-xs:   0.6875rem;  /* 11px — metadata, agent task text */
+  --hub-text-sm:   0.8125rem;  /* 13px — primary content */
+  --hub-text-base: 1rem;       /* 16px — headings inside modules */
+
+  /* ------------------------------------------------------------------ */
+  /* Spacing — inherited from DESIGN.md (4px base)                       */
+  /* ------------------------------------------------------------------ */
+  --hub-space-1:  4px;
+  --hub-space-2:  8px;
+  --hub-space-3:  12px;
+  --hub-space-4:  16px;
+  --hub-space-5:  20px;
+  --hub-space-6:  24px;
+  --hub-space-8:  32px;
+
+  /* ------------------------------------------------------------------ */
+  /* Radius                                                              */
+  /* ------------------------------------------------------------------ */
+  --hub-radius-sm:   4px;
+  --hub-radius-md:   8px;
+  --hub-radius-lg:   12px;
+  --hub-radius-full: 9999px;
+
+  /* ------------------------------------------------------------------ */
+  /* Depth / shadow                                                      */
+  /* ------------------------------------------------------------------ */
+  --hub-shadow-box:   0 8px 32px rgba(0, 0, 0, 0.45),
+                      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --hub-shadow-lift:  0 2px 8px rgba(0, 0, 0, 0.4);
+
+  /* ------------------------------------------------------------------ */
+  /* Motion                                                              */
+  /* ------------------------------------------------------------------ */
+  --hub-ease:         cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --hub-duration-fast: 120ms;
+  --hub-duration-base: 200ms;
+
+  /* ------------------------------------------------------------------ */
+  /* Grid background                                                     */
+  /* ------------------------------------------------------------------ */
+  --hub-grid-color:   rgba(255, 255, 255, 0.015);
+  --hub-grid-size:    48px;
+
+  /* ------------------------------------------------------------------ */
+  /* Hub mode                                                            */
+  /* cockpit = solid dark void (browser tab / dev)                       */
+  /* hud     = transparent overlay (Tauri desktop shell / AR)            */
+  /* Set by JS: document.documentElement.dataset.hubMode = 'hud'         */
+  /* ------------------------------------------------------------------ */
+  --hub-mode: cockpit;
+}
+
+/* HUD mode overrides — active when Tauri sets data-hub-mode="hud" on <html> */
+[data-hub-mode="hud"] {
+  --hub-bg:               transparent;
+  --hub-surface:          rgba(12, 12, 22, 0.70);
+  --hub-surface-raised:   rgba(16, 16, 28, 0.75);
+  --hub-surface-overlay:  rgba(8, 8, 16, 0.80);
+
+  /* Bumped from 0.55 — frosted boxes need more body over busy desktop backdrops */
+  --hub-glass-bg:         rgba(8, 8, 14, 0.65);
+
+  /* Stronger borders for contrast over light/colourful desktop content */
+  --hub-border:           rgba(255, 255, 255, 0.11);
+  --hub-border-strong:    rgba(255, 255, 255, 0.18);
+
+  /* Deeper shadow so boxes lift clearly off the desktop layer */
+  --hub-shadow-box:       0 8px 40px rgba(0, 0, 0, 0.60),
+                          inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}

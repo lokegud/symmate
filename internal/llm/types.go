@@ -3,9 +3,13 @@ package llm
 import "context"
 
 // Message is a single turn in a conversation.
+// Role is one of: "user", "assistant", "system", "tool"
 type Message struct {
-	Role    string `json:"role"`    // "user" | "assistant" | "system"
-	Content string `json:"content"`
+	Role       string     `json:"role"`
+	Content    string     `json:"content"`
+	Name       string     `json:"name,omitempty"`       // tool name (role=tool)
+	ToolCallID string     `json:"tool_call_id,omitempty"` // result target (role=tool)
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"` // requests from LLM (role=assistant)
 }
 
 // Provider sends messages to an LLM and returns the assistant reply.

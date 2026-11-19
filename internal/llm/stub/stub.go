@@ -1,11 +1,9 @@
 // Package stub provides a fake LLM server for integration tests.
-// It speaks both the Anthropic Messages API (/v1/messages) and the
-// OpenAI-compatible API (/v1/chat/completions) so tests can exercise
-// AnthropicProvider and HermesProvider without hitting the real network.
 package stub
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -14,11 +12,7 @@ import (
 
 // Server is a fake LLM API server backed by httptest.
 type Server struct {
-	// URL is the base URL (e.g. "http://127.0.0.1:PORT").
-	// For Anthropic tests pass Server.URL+"/v1/messages" as the endpoint.
-	// For OpenAI-compat tests pass Server.URL+"/v1" as the endpoint.
 	URL string
-
 	srv *httptest.Server
 	mu  sync.Mutex
 
@@ -32,7 +26,6 @@ type nextError struct {
 	message    string
 }
 
-// New starts a stub server and returns it. Call Close when done.
 func New() *Server {
 	s := &Server{reply: "stub reply"}
 	s.srv = httptest.NewServer(http.HandlerFunc(s.handle))
@@ -40,40 +33,31 @@ func New() *Server {
 	return s
 }
 
-// SetReply sets the text the stub will return for the next (and subsequent) calls.
 func (s *Server) SetReply(reply string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.reply = reply
 }
 
-// SetError causes the next call to return an API-level error.
-// statusCode is the HTTP status (e.g. 429, 500).
-// message is the error text embedded in the provider's native error format.
-// The error is consumed after one use; subsequent calls return the normal reply.
 func (s *Server) SetError(statusCode int, message string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.nextErr = &nextError{statusCode: statusCode, message: message}
 }
 
-// SetLatency adds a fixed delay before every response. Pass 0 to disable.
 func (s *Server) SetLatency(d time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.latency = d
 }
 
-// Close shuts down the stub server.
-func (s *Server) Close() {
-	s.srv.Close()
-}
+func (s *Server) Close() { s.srv.Close() }
 
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	lat := s.latency
-	err := s.nextErr
-	if err != nil {
+	nerr := s.nextErr
+	if nerr != nil {
 		s.nextErr = nil
 	}
 	reply := s.reply
@@ -85,9 +69,9 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 
 	switch r.URL.Path {
 	case "/v1/messages":
-		s.handleAnthropic(w, r, err, reply)
+		s.handleAnthropic(w, r, nerr, reply)
 	case "/v1/chat/completions":
-		s.handleOpenAI(w, r, err, reply)
+		s.handleOpenAI(w, r, nerr, reply)
 	default:
 		http.NotFound(w, r)
 	}
@@ -111,11 +95,11 @@ type anthropicError struct {
 	} `json:"error"`
 }
 
-func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request, nerr *nextError, reply string) {
+func (s *Server) handleAnthropic(w http.ResponseWriter, _ *http.Request, nerr *nextError, reply string) {
 	w.Header().Set("Content-Type", "application/json")
 	if nerr != nil {
 		w.WriteHeader(nerr.statusCode)
-		enc := anthropicError{}
+		var enc anthropicError
 		enc.Error.Type = "error"
 		enc.Error.Message = nerr.message
 		json.NewEncoder(w).Encode(enc)
@@ -129,16 +113,20 @@ func (s *Server) handleAnthropic(w http.ResponseWriter, r *http.Request, nerr *n
 
 // --- OpenAI-compat format ---
 
-type openAIResponse struct {
-	Choices []openAIChoice `json:"choices"`
+type openAIStreamChunk struct {
+	ID      string      `json:"id"`
+	Object  string      `json:"object"`
+	Choices []sseChoice `json:"choices"`
 }
 
-type openAIChoice struct {
-	Message openAIMessage `json:"message"`
+type sseChoice struct {
+	Index        int      `json:"index"`
+	Delta        sseDelta `json:"delta"`
+	FinishReason *string  `json:"finish_reason"`
 }
 
-type openAIMessage struct {
-	Role    string `json:"role"`
+type sseDelta struct {
+	Role    string `json:"role,omitempty"`
 	Content string `json:"content"`
 }
 
@@ -148,19 +136,85 @@ type openAIError struct {
 	} `json:"error"`
 }
 
+type openAIRequest struct {
+	Stream bool `json:"stream"`
+}
+
 func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request, nerr *nextError, reply string) {
-	w.Header().Set("Content-Type", "application/json")
+	var req openAIRequest
+	json.NewDecoder(r.Body).Decode(&req)
+
 	if nerr != nil {
+		if req.Stream {
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.WriteHeader(nerr.statusCode)
+			errChunk := map[string]interface{}{
+				"error": map[string]string{"message": nerr.message},
+			}
+			data, _ := json.Marshal(errChunk)
+			fmt.Fprintf(w, "data: %s\n\ndata: [DONE]\n\n", data)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(nerr.statusCode)
-		enc := openAIError{}
+		var enc openAIError
 		enc.Error.Message = nerr.message
 		json.NewEncoder(w).Encode(enc)
 		return
 	}
+
+	if req.Stream {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.WriteHeader(http.StatusOK)
+		stop := "stop"
+		// Role announcement: role present, no content (proper OpenAI streaming format).
+		roleChunk := openAIStreamChunk{
+			ID:     "stub-id",
+			Object: "chat.completion.chunk",
+			Choices: []sseChoice{
+				{Index: 0, Delta: sseDelta{Role: "assistant"}},
+			},
+		}
+		data, _ := json.Marshal(roleChunk)
+		fmt.Fprintf(w, "data: %s\n\n", data)
+		// Content chunk: no role.
+		contentChunk := openAIStreamChunk{
+			ID:     "stub-id",
+			Object: "chat.completion.chunk",
+			Choices: []sseChoice{
+				{Index: 0, Delta: sseDelta{Content: reply}},
+			},
+		}
+		data, _ = json.Marshal(contentChunk)
+		fmt.Fprintf(w, "data: %s\n\n", data)
+		// Stop chunk.
+		contentChunk.Choices[0].Delta = sseDelta{}
+		contentChunk.Choices[0].FinishReason = &stop
+		data, _ = json.Marshal(contentChunk)
+		fmt.Fprintf(w, "data: %s\n\ndata: [DONE]\n\n", data)
+		return
+	}
+
+	type openAIResponse struct {
+		Choices []struct {
+			Message struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(openAIResponse{
-		Choices: []openAIChoice{
-			{Message: openAIMessage{Role: "assistant", Content: reply}},
-		},
+		Choices: []struct {
+			Message struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			} `json:"message"`
+		}{{Message: struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		}{Role: "assistant", Content: reply}}},
 	})
 }
