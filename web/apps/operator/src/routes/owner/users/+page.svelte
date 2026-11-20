@@ -113,7 +113,7 @@
 					{/each}
 				</fieldset>
 			{:else}
-				<p class="hint">No restricted tools are registered on this Symmate yet (set GITHUB_TOKEN or GITHUB_REPO to enable the GitHub tools).</p>
+				<p class="hint">No tool groups to grant: either no integrations are enabled (set GITHUB_TOKEN or GITHUB_REPO for GitHub) or the Policy allowlist blocks them all.</p>
 			{/if}
 			<div class="form-footer">
 				<button type="submit" class="btn btn--primary" disabled={busy}>Add user</button>

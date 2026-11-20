@@ -36,11 +36,18 @@ func toView(u visitor.RegisteredUser) userView {
 
 const maxUserNameLen = 80
 
-// validateGroups rejects groups that no registered tool uses, so typos don't
-// silently grant nothing (or grant something added later).
+// validateGroups rejects any group that wouldn't unlock a tool right now (unknown,
+// typo, or blocked by the tool_tags allowlist): a toggle with no effect isn't offered.
 func (s *Server) validateGroups(groups []string) error {
+	if len(groups) == 0 {
+		return nil
+	}
+	cfg, err := s.ownerMgr.Load()
+	if err != nil {
+		return err
+	}
 	known := map[string]bool{}
-	for _, g := range s.toolGroups {
+	for _, g := range s.grantableGroups(cfg) {
 		known[g] = true
 	}
 	for _, g := range groups {
@@ -49,7 +56,7 @@ func (s *Server) validateGroups(groups []string) error {
 			continue
 		}
 		if !known[g] {
-			return errors.New("unknown tool group: " + g)
+			return errors.New("tool group has no tools available: " + g)
 		}
 	}
 	return nil
@@ -66,13 +73,9 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 	for _, u := range cfg.Users {
 		users = append(users, toView(u))
 	}
-	groups := s.toolGroups
-	if groups == nil {
-		groups = []string{}
-	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"enabled":          cfg.UsersEnabled,
-		"available_groups": groups,
+		"available_groups": s.grantableGroups(cfg),
 		"users":            users,
 	})
 }

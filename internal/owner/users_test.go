@@ -19,7 +19,13 @@ func newTestServer(t *testing.T) (http.Handler, *visitor.OwnerManager, string) {
 	if err := m.Update(func(c *visitor.OwnerConfig) error { return c.Enroll(testPhrase, "") }); err != nil {
 		t.Fatal(err)
 	}
-	h := New(dir, m, nil, nil).WithToolGroups([]string{"engineering", "sales"}).Router()
+	h := New(dir, m, nil, nil).WithToolGroups(func(tags []string) []string {
+		// "sales" is blocked whenever an allowlist is set without it.
+		if len(tags) > 0 && tags[0] == "engineering" {
+			return []string{"engineering"}
+		}
+		return []string{"engineering", "sales"}
+	}).Router()
 
 	w := do(t, h, "", http.MethodPost, "/auth/login", `{"phrase":"`+testPhrase+`"}`)
 	var out struct{ Token string }
@@ -103,6 +109,15 @@ func TestUsersAPI(t *testing.T) {
 	}
 	if w := do(t, h, tok, http.MethodDelete, "/users/"+id, ""); w.Code != http.StatusNotFound {
 		t.Errorf("second delete: %d", w.Code)
+	}
+
+	// A Policy allowlist that blocks "sales" removes it from the toggles and from validation.
+	_ = m.Update(func(c *visitor.OwnerConfig) error { c.ToolTags = []string{"engineering"}; return nil })
+	if w := do(t, h, tok, http.MethodGet, "/users", ""); !strings.Contains(w.Body.String(), `"available_groups":["engineering"]`) {
+		t.Errorf("blocked group still offered: %s", w.Body.String())
+	}
+	if w := do(t, h, tok, http.MethodPost, "/users", `{"name":"Cy","groups":["sales"]}`); w.Code != http.StatusBadRequest {
+		t.Errorf("blocked group accepted: %d", w.Code)
 	}
 
 	// Owner enrolment survives all the user edits (Update must not clobber other fields).

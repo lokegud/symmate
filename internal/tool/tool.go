@@ -17,11 +17,12 @@ type Tool struct {
 	Skill string
 	// Tags are hierarchical labels (e.g. "net/fetch", "time") used to filter which
 	// tools a given satellite may access. An empty slice means the tool is always included.
-	// The first segment of each tag ("engineering" in "engineering/pr") is the tool's group.
+	// The first segment of the FIRST tag ("engineering" in "engineering/pr") is the
+	// tool's group — the single toggle that grants it to a registered user.
 	Tags []string
 	// Public tools are available to every caller, including anonymous visitors.
 	// Non-public tools are restricted: only the owner, or a registered user who has
-	// been granted every group the tool belongs to, can see and call them.
+	// been granted the tool's group, can see and call them.
 	Public bool
 }
 
@@ -44,18 +45,15 @@ func OwnerAccess(tags []string) Access { return Access{Tags: tags, Groups: []str
 // PublicAccess is the access level of an anonymous visitor.
 func PublicAccess(tags []string) Access { return Access{Tags: tags} }
 
-// Groups returns the distinct groups (first tag segment) a tool belongs to.
-func (t Tool) Groups() []string {
-	seen := map[string]bool{}
-	var out []string
-	for _, tag := range t.Tags {
-		g, _, _ := strings.Cut(tag, "/")
-		if g != "" && !seen[g] {
-			seen[g] = true
-			out = append(out, g)
-		}
+// Group returns the tool's single access group: the first segment of its first tag.
+// Exactly one group per tool means every user toggle maps to a concrete set of tools.
+// Returns "" for an untagged tool (restricted ones are then owner-only).
+func (t Tool) Group() string {
+	if len(t.Tags) == 0 {
+		return ""
 	}
-	return out
+	g, _, _ := strings.Cut(t.Tags[0], "/")
+	return g
 }
 
 // allowed reports whether the tool should be visible given allowedTags.
@@ -76,8 +74,6 @@ func (t Tool) allowed(allowedTags []string) bool {
 }
 
 // permits reports whether a caller with access a may use t.
-// A restricted tool spanning several groups (e.g. sales + cs) requires all of them,
-// so granting one department never leaks another department's data.
 func (t Tool) permits(a Access) bool {
 	if !t.allowed(a.Tags) {
 		return false
@@ -85,23 +81,13 @@ func (t Tool) permits(a Access) bool {
 	if t.Public {
 		return true
 	}
-	granted := map[string]bool{}
+	group := t.Group()
 	for _, g := range a.Groups {
-		if g == AllGroups {
+		if g == AllGroups || (g == group && group != "") {
 			return true
 		}
-		granted[g] = true
 	}
-	groups := t.Groups()
-	if len(groups) == 0 {
-		return false // restricted tool with no group: owner only
-	}
-	for _, g := range groups {
-		if !granted[g] {
-			return false
-		}
-	}
-	return true
+	return false
 }
 
 // Registry holds the tools available to a Symmate instance.
@@ -176,15 +162,16 @@ func (reg *Registry) ExecutorFor(a Access) llm.ToolExecutor {
 	}
 }
 
-// RestrictedGroups returns the sorted set of groups used by registered non-public tools.
-// These are the toggles the owner can grant to registered users.
-func (reg *Registry) RestrictedGroups() []string {
+// GrantableGroups returns the sorted groups the owner can usefully toggle for a user:
+// groups of registered restricted tools that the satellite allowlist (allowedTags)
+// doesn't block. A group not listed here would unlock nothing, so it isn't offered.
+func (reg *Registry) GrantableGroups(allowedTags []string) []string {
 	seen := map[string]bool{}
 	for _, t := range reg.tools {
-		if t.Public {
+		if t.Public || !t.allowed(allowedTags) {
 			continue
 		}
-		for _, g := range t.Groups() {
+		if g := t.Group(); g != "" {
 			seen[g] = true
 		}
 	}
