@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/loke/symmate/internal/aeo"
+	"github.com/loke/symmate/internal/tier"
 )
 
 //go:embed chat.html
@@ -47,6 +48,8 @@ func NewRouter(hc *aeo.HostContext, brain Brain, sessions *Sessions, ff *Forcefi
 		w.Write(chatHTML)
 	})
 	r.Post("/chat", chatHandler(hc, brain, sessions, ff, store, ownerMgr))
+	r.Post("/verify", verifyHandler(sessions))
+	r.Post("/meetings", meetingRequestHandler(sessions, sessions.MeetingStore()))
 	r.Get("/id", idHandler(hc.Profile))
 	r.Get("/llms.txt", llmsTxtHandler(hc))
 	r.Get("/health", healthHandler)
@@ -123,12 +126,24 @@ func chatHandler(hc *aeo.HostContext, brain Brain, sessions *Sessions, ff *Force
 		}
 
 		// Inject owner mode, recognition level, and history length into context.
+		// A registered user is authenticated once per request, by token.
+		u, isUser := authenticateUser(r, req, ownerMgr)
 		if sess.IsOwner() {
 			ctx = WithOwnerMode(ctx, true)
-		} else if u, ok := authenticateUser(r, req, ownerMgr); ok {
+		} else if isUser {
 			ctx = WithUser(ctx, u)
 		}
 		ctx = WithRecognitionLevel(ctx, sess.RecognitionLevel())
+		// The brain sees only the tier; what each tier may reveal is decided in code.
+		// A registered user with tier 4 gets full access; otherwise the session's tier applies.
+		switch {
+		case sess.IsOwner():
+			ctx = tier.WithLevel(ctx, tier.All)
+		case isUser && u.Tier == 4:
+			ctx = tier.WithLevel(ctx, tier.All)
+		default:
+			ctx = tier.WithLevel(ctx, sess.Tier())
+		}
 		ctx = WithHistoryLen(ctx, len(history))
 
 		// Start SSE stream immediately so the browser sees the connection as live
@@ -258,7 +273,7 @@ func authenticateUser(r *http.Request, req ChatRequest, ownerMgr *OwnerManager) 
 	if u == nil {
 		return UserInfo{}, false
 	}
-	info := UserInfo{ID: u.ID, Name: u.Name, Groups: append([]string(nil), u.Groups...)}
+	info := UserInfo{ID: u.ID, Name: u.Name, Groups: append([]string(nil), u.Groups...), Tier: u.Tier}
 	if time.Since(u.LastSeen) > lastSeenInterval {
 		id := u.ID
 		_ = ownerMgr.Update(func(c *OwnerConfig) error {

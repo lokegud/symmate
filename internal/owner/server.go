@@ -20,6 +20,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/loke/symmate/internal/llm"
 	"github.com/loke/symmate/internal/storage"
+	"github.com/loke/symmate/internal/tier"
 	"github.com/loke/symmate/internal/visitor"
 	"github.com/rs/zerolog/log"
 )
@@ -40,6 +41,7 @@ type Server struct {
 	llmStore      *llm.OverrideStore
 	allowedOrigin string
 	toolGroups    func(allowedTags []string) []string // grantable groups under a tool_tags allowlist
+	meetings      *tier.MeetingStore
 
 	mu       sync.Mutex
 	sessions map[string]time.Time // token → expiry
@@ -115,6 +117,9 @@ func (s *Server) Router() http.Handler {
 
 		r.Get("/llm", s.getLLM)
 		r.Put("/llm", s.putLLM)
+
+		r.Get("/meetings", s.listMeetings)
+		r.Post("/meetings/{id}/decide", s.decideMeeting)
 
 		r.Get("/users", s.listUsers)
 		r.Put("/users/settings", s.putUserSettings)

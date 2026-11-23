@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -22,6 +23,7 @@ import (
 	"github.com/loke/symmate/internal/owner"
 	"github.com/loke/symmate/internal/personality"
 	"github.com/loke/symmate/internal/storage"
+	"github.com/loke/symmate/internal/tier"
 	"github.com/loke/symmate/internal/tool"
 	"github.com/loke/symmate/internal/visitor"
 	"github.com/loke/symmate/pkg/version"
@@ -165,6 +167,19 @@ func main() {
 		trace:    traceLog,
 	}
 	sessions := visitor.NewSessions(cfg.Visitor.RatePerMin, cfg.Visitor.TokenCap)
+	meetingStore := tier.NewMeetingStore(filepath.Join(cfg.Host.HostDir, "meeting-requests.json"))
+	sessions.SetMeetingStore(meetingStore)
+	// Tier 3 verification: facts are stored as hashes; nothing here reaches the model.
+	verifier, verr := tier.LoadVerifier(filepath.Join(cfg.Host.HostDir, "tier-verify.json"))
+	switch {
+	case verr == nil:
+		sessions.SetVerifier(verifier)
+		l.Info().Msg("tier 3 verification enabled")
+	case errors.Is(verr, tier.ErrNotConfigured):
+		l.Info().Msg("tier 3 verification not configured; visitors stay at public tier")
+	default:
+		l.Warn().Err(verr).Msg("tier 3 verification disabled: bad tier-verify.json")
+	}
 	var ff *visitor.Forcefield
 	if cfg.Visitor.PokerEndpoint != "" {
 		ff = visitor.NewForcefield(cfg.Visitor.PokerEndpoint)
@@ -175,7 +190,7 @@ func main() {
 	}
 
 	// --- :7841 Owner API ---
-	ownerServer := owner.New(cfg.Host.HostDir, ownerMgr, db, llmStore).WithToolGroups(toolReg.GrantableGroups)
+	ownerServer := owner.New(cfg.Host.HostDir, ownerMgr, db, llmStore).WithToolGroups(toolReg.GrantableGroups).WithMeetings(meetingStore)
 	ownerAPIServer := &http.Server{
 		Addr:    "127.0.0.1:7841",
 		Handler: ownerServer.Router(),

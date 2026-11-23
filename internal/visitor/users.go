@@ -14,13 +14,30 @@ import (
 // RegisteredUser is someone other than the owner who has been given an access token
 // and a set of tool-group toggles. Only the token's SHA-256 is stored.
 type RegisteredUser struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	TokenHash string    `json:"token_hash"`
-	Enabled   bool      `json:"enabled"`
-	Groups    []string  `json:"groups"` // restricted tool groups granted, e.g. ["engineering"]
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	TokenHash string   `json:"token_hash"`
+	Enabled   bool     `json:"enabled"`
+	Groups    []string `json:"groups"` // restricted tool groups granted, e.g. ["engineering"]
+	// Tier is the visitor tier this person gets when they authenticate with their token.
+	// 0 means no tier override (the session's tier applies). 4 means full access.
+	Tier      int       `json:"tier,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	LastSeen  time.Time `json:"last_seen,omitempty"`
+}
+
+// SetUserTier sets a user's tier override. Only 0 (none) and 4 (all) are valid.
+// Tier 3 is never granted by hand; it comes from verification.
+func (c *OwnerConfig) SetUserTier(id string, tier int) error {
+	if tier != 0 && tier != 4 {
+		return errors.New("tier must be 0 (none) or 4 (all)")
+	}
+	u := c.User(id)
+	if u == nil {
+		return ErrUserNotFound
+	}
+	u.Tier = tier
+	return nil
 }
 
 // ErrUserNotFound is returned when a user ID does not exist.
@@ -31,6 +48,7 @@ type UserInfo struct {
 	ID     string
 	Name   string
 	Groups []string
+	Tier   int
 }
 
 type userCtxKey struct{}

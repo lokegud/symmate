@@ -3,10 +3,13 @@ package visitor
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"net"
 	"sync"
 	"time"
 
 	"golang.org/x/time/rate"
+
+	"github.com/loke/symmate/internal/tier"
 )
 
 const (
@@ -27,6 +30,43 @@ type Session struct {
 	lastSeen       time.Time
 	conversationID string
 	recognition    RecognitionState
+	tier           tier.Level // 0 means unset, which resolves to DefaultAnonymous
+	verifyFails    int
+}
+
+// Tier returns the session's access tier, defaulting to tier.DefaultAnonymous.
+func (s *Session) Tier() tier.Level {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.tier == 0 {
+		return tier.DefaultAnonymous
+	}
+	return s.tier
+}
+
+// SetTier records a tier granted to this session.
+func (s *Session) SetTier(l tier.Level) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.tier = l
+}
+
+// verifyLockoutAfter is how many failed verification attempts a session gets
+// before it is locked out of verification for its lifetime.
+const verifyLockoutAfter = 5
+
+// VerifyLocked reports whether this session has used up its verification attempts.
+func (s *Session) VerifyLocked() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.verifyFails >= verifyLockoutAfter
+}
+
+// RecordVerifyFailure counts a failed attempt.
+func (s *Session) RecordVerifyFailure() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.verifyFails++
 }
 
 // Allow checks the rate limiter without consuming a token.
@@ -104,6 +144,36 @@ type Sessions struct {
 	sessions   map[string]*Session
 	ratePerMin int
 	tokenCap   int
+	verifier   *tier.Verifier // nil means tier 3 verification is off
+	meetings   *tier.MeetingStore
+}
+
+// SetMeetingStore enables tier 3 meeting requests. Nil disables them.
+func (s *Sessions) SetMeetingStore(m *tier.MeetingStore) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.meetings = m
+}
+
+// MeetingStore returns the meeting store, or nil when requests are off.
+func (s *Sessions) MeetingStore() *tier.MeetingStore {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.meetings
+}
+
+// SetVerifier enables tier 3 verification with the given facts. Nil disables it.
+func (s *Sessions) SetVerifier(v *tier.Verifier) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.verifier = v
+}
+
+// Verifier returns the configured verifier, or nil when verification is off.
+func (s *Sessions) Verifier() *tier.Verifier {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.verifier
 }
 
 // NewSessions creates a session store with the given limits.
@@ -124,7 +194,13 @@ func NewSessions(ratePerMin, tokenCap int) *Sessions {
 }
 
 // Get returns or creates the session for a given IP.
-func (s *Sessions) Get(ip string) *Session {
+func (s *Sessions) Get(addr string) *Session {
+	// Key by host only. The client port changes with every new connection, so keying
+	// on ip:port would drop the session, and its tier, whenever the browser reconnects.
+	ip := addr
+	if host, _, err := net.SplitHostPort(addr); err == nil {
+		ip = host
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	sess, ok := s.sessions[ip]

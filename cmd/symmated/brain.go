@@ -11,6 +11,7 @@ import (
 	"github.com/loke/symmate/internal/firewall"
 	"github.com/loke/symmate/internal/llm"
 	"github.com/loke/symmate/internal/personality"
+	"github.com/loke/symmate/internal/tier"
 	"github.com/loke/symmate/internal/tool"
 	"github.com/loke/symmate/internal/visitor"
 	"github.com/rs/zerolog/log"
@@ -103,8 +104,15 @@ func (b *Brain) Chat(ctx context.Context, msgs []visitor.Message) (<-chan string
 	sysPrompt := b.loader.Current()
 	tag := inferTag(msgs)
 
+	// Visitor tiers: the disclosure block exists only in this caller's prompt,
+	// and only at tier 3 and above. Owners see everything, so they skip it.
+	level := tier.LevelFrom(ctx)
 	if ownerMode {
 		sysPrompt += ownerSystemPromptSuffix
+	} else if d, err := loadTierData(b.hostDir); err != nil {
+		log.Warn().Err(err).Msg("tier data unreadable; no disclosure block this turn")
+	} else {
+		sysPrompt += tierPromptAddendum(level, d)
 	}
 
 	acc := b.access(ctx)
@@ -184,13 +192,32 @@ func (b *Brain) Chat(ctx context.Context, msgs []visitor.Message) (<-chan string
 				}
 				return
 			}
+			if b.firewall == nil {
+				ch <- "(error: firewall unavailable)"
+				return
+			}
+			filtered, _ := b.firewall.Filter(ctx, reply, tierGrants(level))
 			select {
 			case <-ctx.Done():
-			case ch <- reply:
+			case ch <- filtered:
 			}
 			return
 		}
-		err := b.router.RouteStream(llmCtx, tag, llmMsgs, ch)
+		// Stream through the firewall, one sentence at a time, before the visitor sees it.
+		if b.firewall == nil {
+			ch <- "(error: firewall unavailable)"
+			return
+		}
+		grants := tierGrants(level)
+		raw := make(chan string, 16)
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			filterStream(ctx, b.firewall, grants, raw, ch)
+		}()
+		err := b.router.RouteStream(llmCtx, tag, llmMsgs, raw)
+		close(raw)
+		<-done
 		emitTrace(b.trace, ctx, provider, model, tag, sysPromptLen, start, nil, err)
 		if err != nil {
 			select {

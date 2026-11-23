@@ -1,6 +1,6 @@
 # Binaries
 bin/
-symmated
+/symmated
 *.exe
 *.exe~
 *.dll
