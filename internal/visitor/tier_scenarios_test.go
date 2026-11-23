@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/loke/symmate/internal/tier"
+	"github.com/loke/tiers"
 )
 
 // levelSeen sends one chat as addr, optionally with a registered user's token,

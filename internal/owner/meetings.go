@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/loke/symmate/internal/tier"
+	"github.com/loke/tiers"
 )
 
 // WithMeetings attaches the meeting-request store. Nil disables the routes.

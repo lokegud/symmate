@@ -23,10 +23,10 @@ import (
 	"github.com/loke/symmate/internal/owner"
 	"github.com/loke/symmate/internal/personality"
 	"github.com/loke/symmate/internal/storage"
-	"github.com/loke/symmate/internal/tier"
 	"github.com/loke/symmate/internal/tool"
 	"github.com/loke/symmate/internal/visitor"
 	"github.com/loke/symmate/pkg/version"
+	"github.com/loke/tiers"
 	"github.com/rs/zerolog/log"
 )
 

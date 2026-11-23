@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/loke/symmate/internal/tier"
+	"github.com/loke/tiers"
 )
 
 // verifyHandler checks a visitor's three facts in code and, on a full match,

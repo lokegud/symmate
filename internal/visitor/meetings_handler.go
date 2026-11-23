@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/loke/symmate/internal/tier"
+	"github.com/loke/tiers"
 )
 
 // meetingRequestHandler lets a tier 3 visitor ask for time. The request waits for

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/loke/symmate/internal/tier"
+	"github.com/loke/tiers"
 )
 
 func verifierForTest(t *testing.T) *tier.Verifier {

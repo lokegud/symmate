@@ -20,8 +20,8 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/loke/symmate/internal/llm"
 	"github.com/loke/symmate/internal/storage"
-	"github.com/loke/symmate/internal/tier"
 	"github.com/loke/symmate/internal/visitor"
+	"github.com/loke/tiers"
 	"github.com/rs/zerolog/log"
 )
 

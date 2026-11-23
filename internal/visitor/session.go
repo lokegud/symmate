@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"github.com/loke/symmate/internal/tier"
+	"github.com/loke/tiers"
 )
 
 const (

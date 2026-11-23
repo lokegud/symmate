@@ -12,7 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/loke/symmate/internal/aeo"
-	"github.com/loke/symmate/internal/tier"
+	"github.com/loke/tiers"
 )
 
 //go:embed chat.html

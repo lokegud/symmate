@@ -11,9 +11,9 @@ import (
 	"github.com/loke/symmate/internal/firewall"
 	"github.com/loke/symmate/internal/llm"
 	"github.com/loke/symmate/internal/personality"
-	"github.com/loke/symmate/internal/tier"
 	"github.com/loke/symmate/internal/tool"
 	"github.com/loke/symmate/internal/visitor"
+	"github.com/loke/tiers"
 	"github.com/rs/zerolog/log"
 )
 
@@ -109,10 +109,10 @@ func (b *Brain) Chat(ctx context.Context, msgs []visitor.Message) (<-chan string
 	level := tier.LevelFrom(ctx)
 	if ownerMode {
 		sysPrompt += ownerSystemPromptSuffix
-	} else if d, err := loadTierData(b.hostDir); err != nil {
+	} else if d, err := loadDisclosure(b.hostDir); err != nil {
 		log.Warn().Err(err).Msg("tier data unreadable; no disclosure block this turn")
 	} else {
-		sysPrompt += tierPromptAddendum(level, d)
+		sysPrompt += tier.PromptBlock(level, d)
 	}
 
 	acc := b.access(ctx)
@@ -196,7 +196,7 @@ func (b *Brain) Chat(ctx context.Context, msgs []visitor.Message) (<-chan string
 				ch <- "(error: firewall unavailable)"
 				return
 			}
-			filtered, _ := b.firewall.Filter(ctx, reply, tierGrants(level))
+			filtered := firewallRedactor(b.firewall)(ctx, reply, tier.GrantsFor(level))
 			select {
 			case <-ctx.Done():
 			case ch <- filtered:
@@ -208,12 +208,12 @@ func (b *Brain) Chat(ctx context.Context, msgs []visitor.Message) (<-chan string
 			ch <- "(error: firewall unavailable)"
 			return
 		}
-		grants := tierGrants(level)
+		grants := tier.GrantsFor(level)
 		raw := make(chan string, 16)
 		done := make(chan struct{})
 		go func() {
 			defer close(done)
-			filterStream(ctx, b.firewall, grants, raw, ch)
+			tier.FilterStream(ctx, firewallRedactor(b.firewall), grants, raw, ch)
 		}()
 		err := b.router.RouteStream(llmCtx, tag, llmMsgs, raw)
 		close(raw)
