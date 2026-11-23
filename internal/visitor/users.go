@@ -20,17 +20,17 @@ type RegisteredUser struct {
 	Enabled   bool     `json:"enabled"`
 	Groups    []string `json:"groups"` // restricted tool groups granted, e.g. ["engineering"]
 	// Tier is the visitor tier this person gets when they authenticate with their token.
-	// 0 means no tier override (the session's tier applies). 4 means full access.
+	// 0 means no override (the session's tier applies). 1 means blocked. 4 means full access.
 	Tier      int       `json:"tier,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	LastSeen  time.Time `json:"last_seen,omitempty"`
 }
 
-// SetUserTier sets a user's tier override. Only 0 (none) and 4 (all) are valid.
-// Tier 3 is never granted by hand; it comes from verification.
+// SetUserTier sets a user's tier override: 0 (none), 1 (blocked) or 4 (all).
+// Tier 2 is the default and tier 3 comes from verification, so neither is granted by hand.
 func (c *OwnerConfig) SetUserTier(id string, tier int) error {
-	if tier != 0 && tier != 4 {
-		return errors.New("tier must be 0 (none) or 4 (all)")
+	if tier != 0 && tier != 1 && tier != 4 {
+		return errors.New("tier must be 0 (none), 1 (blocked) or 4 (all)")
 	}
 	u := c.User(id)
 	if u == nil {

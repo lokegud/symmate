@@ -136,13 +136,22 @@ func chatHandler(hc *aeo.HostContext, brain Brain, sessions *Sessions, ff *Force
 		ctx = WithRecognitionLevel(ctx, sess.RecognitionLevel())
 		// The brain sees only the tier; what each tier may reveal is decided in code.
 		// A registered user with tier 4 gets full access; otherwise the session's tier applies.
+		level := sess.Tier()
 		switch {
 		case sess.IsOwner():
-			ctx = tier.WithLevel(ctx, tier.All)
+			level = tier.All
 		case isUser && u.Tier == 4:
-			ctx = tier.WithLevel(ctx, tier.All)
-		default:
-			ctx = tier.WithLevel(ctx, sess.Tier())
+			level = tier.All
+		case isUser && u.Tier == 1:
+			level = tier.Blocked
+		}
+		ctx = tier.WithLevel(ctx, level)
+		if level == tier.Blocked {
+			// No access at all: refuse before any context or model call.
+			sse := NewSSEWriter(w)
+			sse.Send("I can't help with that here.")
+			sse.Done()
+			return
 		}
 		ctx = WithHistoryLen(ctx, len(history))
 

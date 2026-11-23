@@ -17,7 +17,7 @@ type userView struct {
 	Name      string     `json:"name"`
 	Enabled   bool       `json:"enabled"`
 	Groups    []string   `json:"groups"`
-	Tier      int        `json:"tier"` // 0 none, 4 full access
+	Tier      int        `json:"tier"` // 0 none, 1 blocked, 4 full access
 	CreatedAt time.Time  `json:"created_at"`
 	LastSeen  *time.Time `json:"last_seen,omitempty"` // nil until first seen
 }
@@ -120,8 +120,8 @@ func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if req.Tier != 0 && req.Tier != 4 {
-		jsonErr(w, "tier must be 0 (none) or 4 (all)", http.StatusBadRequest)
+	if !validUserTier(req.Tier) {
+		jsonErr(w, "tier must be 0 (none), 1 (blocked) or 4 (all)", http.StatusBadRequest)
 		return
 	}
 	var created visitor.RegisteredUser
@@ -162,8 +162,8 @@ func (s *Server) patchUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if req.Tier != nil && *req.Tier != 0 && *req.Tier != 4 {
-		jsonErr(w, "tier must be 0 (none) or 4 (all)", http.StatusBadRequest)
+	if req.Tier != nil && !validUserTier(*req.Tier) {
+		jsonErr(w, "tier must be 0 (none), 1 (blocked) or 4 (all)", http.StatusBadRequest)
 		return
 	}
 	var groups []string
@@ -238,3 +238,6 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 	w.WriteHeader(code)
 	_ = json.NewEncoder(w).Encode(v)
 }
+
+// validUserTier reports whether a tier can be set by hand on a registered user.
+func validUserTier(t int) bool { return t == 0 || t == 1 || t == 4 }
